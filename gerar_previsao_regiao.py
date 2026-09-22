@@ -31,6 +31,7 @@ ou CÓDIGO IBGE funcionam se estiverem no KML.
 
 import os
 import sys
+import time
 import argparse
 import unicodedata
 import datetime as dt
@@ -779,6 +780,11 @@ VARS_VALIDAS = ["chuva", "tmin", "tmax", "nuvem"]
 
 
 def main():
+    # saída sem buffer: no GitHub Actions o log passa a aparecer em tempo real
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except Exception:
+        pass
     ap = argparse.ArgumentParser(description="Previsão ECMWF por estado/mesorregião")
     ap.add_argument("--regiao", nargs="*", default=[],
                     help="uma ou mais regiões (nome/sigla/código). Ex.: --regiao SP MG")
@@ -1029,6 +1035,10 @@ def main():
     # Nenhum acesso à rede aqui.
     # =====================================================================
     print("=== Fase 2: recortes e figuras (sem rede) ===")
+    total_esperado = sum(len(alvos) * len(dias_dados[d]["produtos"]) for d in dias_dados)
+    print(f"A gerar ~{total_esperado} figura(s) ({len(alvos)} alvo(s) x "
+          f"{len(dias_dados)} dia(s)).")
+    inicio = time.time()
     total = 0
     for dias in sorted(dias_dados):
         d = dias_dados[dias]
@@ -1045,8 +1055,15 @@ def main():
                        logo=logo, logo_pos=args.logo_pos,
                        logo_escala=args.logo_escala, logo_alpha=args.logo_alpha)
                 total += 1
-        print(f"  {dias}d: {len(alvos)} alvo(s) x {len(produtos)} produto(s)")
-    print(f"Fase 2 concluída: {total} figura(s).")
+                if total % 50 == 0 or total == total_esperado:
+                    seg = time.time() - inicio
+                    taxa = total / seg if seg > 0 else 0
+                    restam = (total_esperado - total) / taxa if taxa > 0 else 0
+                    print(f"    {total}/{total_esperado} figuras "
+                          f"| {seg:.0f}s decorridos | ~{restam:.0f}s restantes "
+                          f"| {taxa:.1f} fig/s")
+        print(f"  dia {dias}d concluído")
+    print(f"Fase 2 concluída: {total} figura(s) em {time.time() - inicio:.0f}s.")
 
     for pasta in {args.saida, cache_dir or args.saida}:
         for fn in os.listdir(pasta):

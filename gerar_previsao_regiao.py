@@ -817,6 +817,8 @@ def main():
     ap.add_argument("--todas-meso", action="store_true",
                     help="gera TODAS as mesorregiões (as regiões que não são fundo), "
                          "em pastas <saida>/<UF>/<mesorregião>/")
+    ap.add_argument("--todos-estados", action="store_true",
+                    help="gera também cada estado como figura própria, em <saida>/<UF>/")
     ap.add_argument("--cidades", default=None,
                     help="arquivo de cidades (CSV nome,lat,lon ou KML de pontos); "
                          "mostra as que caem dentro da região focada")
@@ -843,8 +845,8 @@ def main():
     pedidos = list(args.regiao)
     if args.regioes:
         pedidos += [p.strip() for p in args.regioes.split(";") if p.strip()]
-    if not pedidos and args.sem_brasil and not args.todas_meso:
-        sys.exit("Nada a gerar: sem regiões, --sem-brasil e sem --todas-meso.")
+    if not pedidos and args.sem_brasil and not args.todas_meso and not args.todos_estados:
+        sys.exit("Nada a gerar: sem regiões, --sem-brasil e sem --todas-meso/--todos-estados.")
 
     existentes = [c for c in args.kml if os.path.exists(c)]
     for c in [c for c in args.kml if not os.path.exists(c)]:
@@ -932,6 +934,12 @@ def main():
         sub, r, ext, cids = _alvo_de_regiao(r)
         alvos.append((sub, r, ext, cids))
         print(f"Alvo: {r['nome']} -> {sub}  cidades={len(cids)}")
+
+    if args.todos_estados:
+        print(f"Todos os estados: {len(fundo_regioes)}")
+        for r in fundo_regioes:
+            sub, r, ext, cids = _alvo_de_regiao(r)
+            alvos.append((sub, r, ext, cids))
 
     if args.todas_meso:
         # mesorregiões = tudo que NÃO é fundo (estado)

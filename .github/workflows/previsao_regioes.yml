@@ -39,6 +39,10 @@ on:
         description: "Variáveis (espaço): chuva tmin tmax nuvem"
         required: false
         default: "chuva tmin tmax nuvem"
+      fonte:
+        description: "Fonte ECMWF em ordem (espelhos evitam 429): aws azure ecmwf"
+        required: false
+        default: "aws azure ecmwf"
       recortar:
         description: "Recortar o preenchimento ao polígono? (sim/nao)"
         required: false
@@ -100,6 +104,7 @@ jobs:
           KML:      ${{ github.event.inputs.kml      || 'estados.kml mesorregioes.kml' }}
           DIAS:     ${{ github.event.inputs.dias     || '1 2 3 4 5 6 7' }}
           VARS:     ${{ github.event.inputs.vars     || 'chuva tmin tmax nuvem' }}
+          FONTE:    ${{ github.event.inputs.fonte    || 'aws azure ecmwf' }}
           RECORTAR: ${{ github.event.inputs.recortar || 'nao' }}
           FUNDO:    ${{ github.event.inputs.fundo     || 'estados.kml' }}
           CIDADES:  ${{ github.event.inputs.cidades   || '' }}
@@ -119,6 +124,7 @@ jobs:
             --regioes "$REGIOES" \
             --kml $KML \
             --vars $VARS \
+            --fonte $FONTE \
             --dias $DIAS \
             --saida previsao_regioes $FLAGS
 

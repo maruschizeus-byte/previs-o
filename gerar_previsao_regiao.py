@@ -432,14 +432,29 @@ def ponto_na_regiao(lon, lat, regiao):
 # =========================================================================
 # ECMWF: download e processamento (genérico por parâmetro)
 # =========================================================================
+# Fontes do ECMWF Open Data, em ordem de tentativa. Os espelhos em nuvem
+# (aws/azure) não têm o limite de 500 conexões do portal principal e evitam o
+# erro 429. 'ecmwf' fica por último, como reserva. Ajustável por --fonte.
+FONTES = ["aws", "azure", "ecmwf"]
+
+
 def baixar(param, step, grib_file, data_rodada=None, hora_rodada=0):
+    """Baixa um passo tentando cada fonte em ordem; se uma falhar (429, etc.),
+    passa para a próxima em vez de insistir no mesmo endpoint congestionado."""
     from ecmwf.opendata import Client
-    client = Client(source="ecmwf")
     kw = dict(type="fc", stream="oper", param=param, step=step, target=grib_file)
     if data_rodada is not None:
         kw["date"] = data_rodada.strftime("%Y%m%d")
         kw["time"] = hora_rodada
-    client.retrieve(**kw)
+    ultimo = None
+    for fonte in FONTES:
+        try:
+            Client(source=fonte).retrieve(**kw)
+            return
+        except Exception as e:
+            ultimo = e
+            print(f"    (fonte '{fonte}' falhou: {e}; tentando a próxima)")
+    raise ultimo if ultimo else RuntimeError("nenhuma fonte disponível")
 
 
 def ler_grib(grib_file, param, fator=1.0, offset=0.0):
@@ -780,6 +795,10 @@ def main():
     ap.add_argument("--fundo", nargs="*", default=None,
                     help="KML(s) usados como contorno de fundo. Padrão: os que "
                          "tiverem 'estado' no nome do arquivo.")
+    ap.add_argument("--fonte", nargs="+", default=None,
+                    choices=["aws", "azure", "ecmwf"],
+                    help="fonte(s) do ECMWF, em ordem de tentativa "
+                         "(padrão: aws azure ecmwf — espelhos primeiro, evita 429)")
     ap.add_argument("--vars", nargs="+", default=VARS_VALIDAS, choices=VARS_VALIDAS,
                     help="variáveis a gerar (padrão: todas)")
     ap.add_argument("--dias", nargs="+", type=int, default=[1, 2, 3, 4, 5, 6, 7],
@@ -809,6 +828,11 @@ def main():
     args = ap.parse_args()
 
     vars_sel = list(dict.fromkeys(args.vars))  # únicas, mantendo ordem
+
+    global FONTES
+    if args.fonte:
+        FONTES = list(dict.fromkeys(args.fonte))
+    print(f"Fontes ECMWF (ordem de tentativa): {', '.join(FONTES)}")
 
     pedidos = list(args.regiao)
     if args.regioes:

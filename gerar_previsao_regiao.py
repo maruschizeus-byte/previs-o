@@ -956,20 +956,24 @@ def main():
     if cache_dir:
         print(f"Cache: {cache_dir} (dia {dia_cache}) — não rebaixa o que já tem")
 
+    # =====================================================================
+    # FASE 1 — DOWNLOAD: baixa tudo primeiro (1x por variável/dia). Toda a
+    # rede acontece aqui; os campos ficam em memória para a fase de corte.
+    # =====================================================================
     print(f"Variáveis: {', '.join(vars_sel)} | dias: {sorted(set(args.dias))} | "
           f"alvos: {len(alvos)}")
-
+    print("=== Fase 1: download do ECMWF ===")
+    dias_dados = {}  # dias -> {"lons","lats","produtos":[...]}
     for dias in sorted(set(args.dias)):
         if dias < 1 or dias > 7:
             print(f"  (pulando dia {dias}: fora de 1..7)")
             continue
         step = dias * 24
         lons = lats = None
-        # produtos = (tipo, campo, titulo, periodo, faixas, cor_acima, cor_abaixo, extend)
-        produtos = []
+        produtos = []  # (tipo, campo, titulo, periodo, faixas, c_acima, c_abaixo, extend)
 
         if "chuva" in vars_sel:
-            print(f"[{dias}d] baixando CHUVA (tp) 1x...")
+            print(f"[{dias}d] chuva (tp)...")
             try:
                 lo, la, acum, diario, valido = obter_chuva(step, tmp, cache_dir=cache_dir, dia=dia_cache)
                 lons, lats = lo, la
@@ -984,7 +988,7 @@ def main():
                 print(f"  ERRO chuva {dias}d: {e}")
 
         if "tmin" in vars_sel or "tmax" in vars_sel:
-            print(f"[{dias}d] baixando TEMPERATURA (2t, sub-passos) 1x...")
+            print(f"[{dias}d] temperatura (2t, sub-passos)...")
             try:
                 lo, la, tmin, tmax, valido = obter_temp(step, tmp, cache_dir=cache_dir, dia=dia_cache)
                 lons, lats = lo, la
@@ -1001,7 +1005,7 @@ def main():
                 print(f"  ERRO temperatura {dias}d: {e}")
 
         if "nuvem" in vars_sel:
-            print(f"[{dias}d] baixando NUVEM (tcc) 1x...")
+            print(f"[{dias}d] nuvem (tcc)...")
             try:
                 lo, la, nuvem, valido = obter_nuvem(step, tmp, cache_dir=cache_dir, dia=dia_cache)
                 lons, lats = lo, la
@@ -1012,11 +1016,23 @@ def main():
             except Exception as e:
                 print(f"  ERRO nuvem {dias}d: {e}")
 
-        if not produtos or lons is None:
-            print(f"  (dia {dias}: nada gerado)")
-            continue
+        if produtos and lons is not None:
+            dias_dados[dias] = {"lons": lons, "lats": lats, "produtos": produtos}
+        else:
+            print(f"  (dia {dias}: sem dados — não entra na fase de corte)")
 
-        # mesmo dado, vários recortes
+    if not dias_dados:
+        sys.exit("Nada foi baixado — nenhuma figura a gerar (ver erros acima).")
+
+    # =====================================================================
+    # FASE 2 — CORTE: gera as figuras a partir dos dados já baixados.
+    # Nenhum acesso à rede aqui.
+    # =====================================================================
+    print("=== Fase 2: recortes e figuras (sem rede) ===")
+    total = 0
+    for dias in sorted(dias_dados):
+        d = dias_dados[dias]
+        lons, lats, produtos = d["lons"], d["lats"], d["produtos"]
         for (subdir, regiao, extent, cids) in alvos:
             outdir = os.path.join(args.saida, subdir)
             os.makedirs(outdir, exist_ok=True)
@@ -1028,11 +1044,14 @@ def main():
                        recortar=args.recortar, cidades=cids,
                        logo=logo, logo_pos=args.logo_pos,
                        logo_escala=args.logo_escala, logo_alpha=args.logo_alpha)
-        print(f"  {dias}d: {len(alvos)} alvo(s) x {len(produtos)} produto(s) gerado(s)")
+                total += 1
+        print(f"  {dias}d: {len(alvos)} alvo(s) x {len(produtos)} produto(s)")
+    print(f"Fase 2 concluída: {total} figura(s).")
 
-    for fn in os.listdir(args.saida):
-        if fn.startswith("_tmp"):
-            _remover(os.path.join(args.saida, fn))
+    for pasta in {args.saida, cache_dir or args.saida}:
+        for fn in os.listdir(pasta):
+            if fn.startswith("_tmp"):
+                _remover(os.path.join(pasta, fn))
     print("Pronto.")
 
 

@@ -16,9 +16,9 @@ on:
         required: false
         default: "SP;MG;GO;MT;BA"
       kml:
-        description: "Arquivo KML (estados ou mesorregiões)"
+        description: "KML(s) separados por espaço (estados e/ou mesorregiões)"
         required: false
-        default: "estados.kml"
+        default: "estados.kml mesorregioes.kml"
       dias:
         description: "Horizontes em dias"
         required: false
@@ -65,7 +65,7 @@ jobs:
       - name: gerar figuras
         env:
           REGIOES:  ${{ github.event.inputs.regioes  || 'SP;MG;GO;MT;BA' }}
-          KML:      ${{ github.event.inputs.kml      || 'estados.kml' }}
+          KML:      ${{ github.event.inputs.kml      || 'estados.kml mesorregioes.kml' }}
           DIAS:     ${{ github.event.inputs.dias     || '1 2 3 4 5 6 7' }}
           RECORTAR: ${{ github.event.inputs.recortar || 'nao' }}
         run: |
@@ -79,10 +79,10 @@ jobs:
             [ -z "$R_TRIM" ] && continue
             echo ">>> gerando: $R_TRIM"
             if [ "$(echo "$R_TRIM" | tr '[:lower:]' '[:upper:]')" = "BRASIL" ]; then
-              python gerar_previsao_regiao.py --brasil --kml "$KML" \
+              python gerar_previsao_regiao.py --brasil --kml $KML \
                 --dias $DIAS --saida previsao_regioes $FLAG_RECORTE
             else
-              python gerar_previsao_regiao.py --regiao "$R_TRIM" --kml "$KML" \
+              python gerar_previsao_regiao.py --regiao "$R_TRIM" --kml $KML \
                 --dias $DIAS --saida previsao_regioes $FLAG_RECORTE
             fi
           done

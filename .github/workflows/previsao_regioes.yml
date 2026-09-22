@@ -12,19 +12,35 @@ on:
   workflow_dispatch:
     inputs:
       regioes:
-        description: "Regiões (nome ou sigla) separadas por ; — ex.: SP;MG;GO;BRASIL"
+        description: "Regiões separadas por ; (nome, sigla ou código IBGE) — ex.: SP;MG;3105"
         required: false
         default: "SP;MG;GO;MT;BA"
       kml:
         description: "KML(s) separados por espaço (estados e/ou mesorregiões)"
         required: false
         default: "estados.kml mesorregioes.kml"
+      fundo:
+        description: "KML(s) do contorno de fundo (vazio = detecta 'estado' no nome)"
+        required: false
+        default: ""
+      cidades:
+        description: "Arquivo de cidades (CSV nome,lat,lon ou KML de pontos) — opcional"
+        required: false
+        default: ""
       dias:
         description: "Horizontes em dias"
         required: false
         default: "1 2 3 4 5 6 7"
+      vars:
+        description: "Variáveis (espaço): chuva tmin tmax nuvem"
+        required: false
+        default: "chuva tmin tmax nuvem"
       recortar:
         description: "Recortar o preenchimento ao polígono? (sim/nao)"
+        required: false
+        default: "nao"
+      brasil:
+        description: "Gerar também o Brasil inteiro? (sim/nao)"
         required: false
         default: "nao"
   schedule:
@@ -67,25 +83,26 @@ jobs:
           REGIOES:  ${{ github.event.inputs.regioes  || 'SP;MG;GO;MT;BA' }}
           KML:      ${{ github.event.inputs.kml      || 'estados.kml mesorregioes.kml' }}
           DIAS:     ${{ github.event.inputs.dias     || '1 2 3 4 5 6 7' }}
+          VARS:     ${{ github.event.inputs.vars     || 'chuva tmin tmax nuvem' }}
           RECORTAR: ${{ github.event.inputs.recortar || 'nao' }}
+          BRASIL:   ${{ github.event.inputs.brasil   || 'nao' }}
+          FUNDO:    ${{ github.event.inputs.fundo     || '' }}
+          CIDADES:  ${{ github.event.inputs.cidades   || '' }}
         run: |
           set -e
-          FLAG_RECORTE=""
-          if [ "$RECORTAR" = "sim" ]; then FLAG_RECORTE="--recortar"; fi
-
-          IFS=';' read -ra LISTA <<< "$REGIOES"
-          for R in "${LISTA[@]}"; do
-            R_TRIM="$(echo "$R" | xargs)"          # tira espaços das pontas
-            [ -z "$R_TRIM" ] && continue
-            echo ">>> gerando: $R_TRIM"
-            if [ "$(echo "$R_TRIM" | tr '[:lower:]' '[:upper:]')" = "BRASIL" ]; then
-              python gerar_previsao_regiao.py --brasil --kml $KML \
-                --dias $DIAS --saida previsao_regioes $FLAG_RECORTE
-            else
-              python gerar_previsao_regiao.py --regiao "$R_TRIM" --kml $KML \
-                --dias $DIAS --saida previsao_regioes $FLAG_RECORTE
-            fi
-          done
+          FLAGS=""
+          [ "$RECORTAR" = "sim" ]   && FLAGS="$FLAGS --recortar"
+          [ "$BRASIL"   = "sim" ]   && FLAGS="$FLAGS --brasil"
+          [ -n "$FUNDO" ]           && FLAGS="$FLAGS --fundo $FUNDO"
+          [ -n "$CIDADES" ]         && FLAGS="$FLAGS --cidades $CIDADES"
+          # UMA única chamada: baixa cada horizonte do ECMWF 1x e recorta
+          # todas as regiões a partir do mesmo dado.
+          python gerar_previsao_regiao.py \
+            --regioes "$REGIOES" \
+            --kml $KML \
+            --vars $VARS \
+            --dias $DIAS \
+            --saida previsao_regioes $FLAGS
 
       - name: commit e push (à prova de conflito)
         run: |

@@ -120,7 +120,7 @@ jobs:
           [ -n "$LOGO" ]            && FLAGS="$FLAGS --logo $LOGO"
           # UMA única chamada: baixa cada horizonte do ECMWF 1x e recorta
           # todas as regiões a partir do mesmo dado.
-          python gerar_previsao_regiao.py \
+          python -u gerar_previsao_regiao.py \
             --regioes "$REGIOES" \
             --kml $KML \
             --vars $VARS \

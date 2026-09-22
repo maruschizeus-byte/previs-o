@@ -171,14 +171,25 @@ def ler_kml(caminho):
                 nome = filho.text.strip()
                 break
         chaves = set()
+        campos = {}
         if nome:
             chaves.add(_sem_acento(nome))
         for sd in achar(pm, "SimpleData"):
             if sd.text:
                 chaves.add(_sem_acento(sd.text))
-        for val in achar(pm, "value"):
-            if val.text:
-                chaves.add(_sem_acento(val.text))
+                nm = sd.get("name")
+                if nm:
+                    campos[_sem_acento(nm)] = sd.text.strip()
+        for d in achar(pm, "Data"):
+            nm = d.get("name")
+            val = None
+            for v in d:
+                if tag(v) == "value" and v.text:
+                    val = v.text.strip()
+            if val:
+                chaves.add(_sem_acento(val))
+                if nm:
+                    campos[_sem_acento(nm)] = val
 
         poligonos = []
         for poly in achar(pm, "Polygon"):
@@ -195,7 +206,7 @@ def ler_kml(caminho):
 
         if poligonos:
             regioes.append({"nome": nome or "(sem nome)", "chaves": chaves,
-                            "poligonos": poligonos,
+                            "campos": campos, "poligonos": poligonos,
                             "arquivo": os.path.basename(caminho)})
     return regioes
 
@@ -233,6 +244,93 @@ def bbox_regiao(regiao):
         for (lon, lat) in poly:
             xs.append(lon); ys.append(lat)
     return min(xs), min(ys), max(xs), max(ys)
+
+
+def bbox_uniao(regioes):
+    """bbox que cobre todas as regiões (usado p/ enquadrar a vista Brasil)."""
+    xs, ys = [], []
+    for r in regioes:
+        for poly in r["poligonos"]:
+            for (lon, lat) in poly:
+                xs.append(lon); ys.append(lat)
+    if not xs:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+# ---- UF: código IBGE / nome -> sigla, para montar as pastas por estado ----
+UF_COD2SIGLA = {
+    11: "RO", 12: "AC", 13: "AM", 14: "RR", 15: "PA", 16: "AP", 17: "TO",
+    21: "MA", 22: "PI", 23: "CE", 24: "RN", 25: "PB", 26: "PE", 27: "AL",
+    28: "SE", 29: "BA", 31: "MG", 32: "ES", 33: "RJ", 35: "SP",
+    41: "PR", 42: "SC", 43: "RS", 50: "MS", 51: "MT", 52: "GO", 53: "DF",
+}
+UF_NOME2SIGLA = {
+    "rondonia": "RO", "acre": "AC", "amazonas": "AM", "roraima": "RR",
+    "para": "PA", "amapa": "AP", "tocantins": "TO", "maranhao": "MA",
+    "piaui": "PI", "ceara": "CE", "rio grande do norte": "RN", "paraiba": "PB",
+    "pernambuco": "PE", "alagoas": "AL", "sergipe": "SE", "bahia": "BA",
+    "minas gerais": "MG", "espirito santo": "ES", "rio de janeiro": "RJ",
+    "sao paulo": "SP", "parana": "PR", "santa catarina": "SC",
+    "rio grande do sul": "RS", "mato grosso do sul": "MS", "mato grosso": "MT",
+    "goias": "GO", "distrito federal": "DF",
+}
+
+
+def _centro_bbox(regiao):
+    lo0, la0, lo1, la1 = bbox_regiao(regiao)
+    return (lo0 + lo1) / 2.0, (la0 + la1) / 2.0
+
+
+def uf_sigla(regiao, estados=None):
+    """Descobre a sigla da UF de uma região, em cascata:
+    1) campo de sigla no KML; 2) nome do estado; 3) código IBGE (2 primeiros
+    dígitos); 4) geometria: centro dentro de qual estado do fundo."""
+    c = regiao.get("campos", {})
+    for k in ("sigla_uf", "sigla", "uf", "cd_uf_sigla"):
+        v = c.get(k, "").strip()
+        if len(v) == 2 and v.isalpha():
+            return v.upper()
+    for k in ("nm_uf", "nome_uf", "estado", "nm_estado", "name_uf"):
+        s = UF_NOME2SIGLA.get(_sem_acento(c.get(k, "")))
+        if s:
+            return s
+    for k in ("cd_uf", "cd_geocuf", "cd_meso", "geocodigo", "codigo",
+              "cd_geocme", "cd_mesorregiao", "cd_rgint"):
+        v = c.get(k, "").strip()
+        if len(v) >= 2 and v[:2].isdigit():
+            s = UF_COD2SIGLA.get(int(v[:2]))
+            if s:
+                return s
+    # nome da própria região casa com um estado?
+    s = UF_NOME2SIGLA.get(_sem_acento(regiao.get("nome", "")))
+    if s:
+        return s
+    # geometria: centro da região dentro de um estado do fundo
+    if estados:
+        clon, clat = _centro_bbox(regiao)
+        for st in estados:
+            if ponto_na_regiao(clon, clat, st):
+                return uf_sigla(st) or None
+    return None
+
+
+def _pasta_segura(nome):
+    """Nome de pasta legível e seguro (troca / por -, tira pontas ruins)."""
+    s = (nome or "").replace("/", "-").replace("\\", "-").strip().strip(".")
+    return s or "sem_nome"
+
+
+def subdir_do_alvo(regiao, estados):
+    """Caminho relativo do alvo: 'brasil', ou '<UF>' p/ estado, ou
+    '<UF>/<mesorregião>' p/ mesorregião."""
+    if regiao is None:
+        return "brasil"
+    ids_estados = {id(r) for r in (estados or [])}
+    if id(regiao) in ids_estados:               # é um estado
+        return uf_sigla(regiao, estados) or _pasta_segura(regiao["nome"])
+    uf = uf_sigla(regiao, estados) or "SEM_UF"  # é mesorregião
+    return os.path.join(uf, _pasta_segura(regiao["nome"]))
 
 
 # =========================================================================
@@ -389,9 +487,55 @@ def _remover(*caminhos):
                     pass
 
 
-def obter_chuva(step, tmp_prefix, data_rodada=None, hora_rodada=0):
+# ---- cache em disco: evita rebaixar o mesmo dado no mesmo dia ----
+def _dt_iso(v):
+    return v.strftime("%Y-%m-%dT%H:%M:%S") if v is not None else ""
+
+
+def _iso_dt(s):
+    s = str(s)
+    if not s:
+        return None
+    try:
+        return dt.datetime.fromisoformat(s)
+    except ValueError:
+        return None
+
+
+def _cache_path(cache_dir, var, dia, step):
+    return os.path.join(cache_dir, f"{var}_{dia}_s{step}.npz")
+
+
+def _cache_load(cache_dir, var, dia, step):
+    if not cache_dir:
+        return None
+    cp = _cache_path(cache_dir, var, dia, step)
+    if os.path.exists(cp):
+        try:
+            return dict(np.load(cp, allow_pickle=False))
+        except Exception:
+            return None
+    return None
+
+
+def _cache_save(cache_dir, var, dia, step, **arrays):
+    if not cache_dir:
+        return
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+        np.savez(_cache_path(cache_dir, var, dia, step), **arrays)
+    except Exception as e:
+        print(f"    (aviso: não consegui gravar cache {var} {step}h: {e})")
+
+
+def obter_chuva(step, tmp_prefix, data_rodada=None, hora_rodada=0,
+                cache_dir=None, dia=None):
     """(lons, lats, acumulado_mm, diario_mm, valido). Acumulado = tp no passo;
     diário = tp(step) - tp(step-24); no dia 1 o anterior é 0."""
+    c = _cache_load(cache_dir, "chuva", dia, step)
+    if c is not None:
+        print(f"    (cache: chuva {step}h)")
+        return c["lons"], c["lats"], c["acum"], c["diario"], _iso_dt(c["valido"])
     g = f"{tmp_prefix}_tp_{step}h.grib2"
     baixar("tp", step, g, data_rodada, hora_rodada)
     lons, lats, acum = ler_grib(g, "tp", 1000.0, 0.0)  # m -> mm
@@ -405,23 +549,38 @@ def obter_chuva(step, tmp_prefix, data_rodada=None, hora_rodada=0):
     else:
         diario = np.clip(acum, 0, None)
     _remover(g)
+    _cache_save(cache_dir, "chuva", dia, step, lons=lons, lats=lats,
+                acum=acum, diario=diario, valido=_dt_iso(valido))
     return lons, lats, acum, diario, valido
 
 
-def obter_nuvem(step, tmp_prefix, data_rodada=None, hora_rodada=0):
+def obter_nuvem(step, tmp_prefix, data_rodada=None, hora_rodada=0,
+                cache_dir=None, dia=None):
     """(lons, lats, nuvem_%, valido). tcc é fração instantânea 0..1."""
+    c = _cache_load(cache_dir, "nuvem", dia, step)
+    if c is not None:
+        print(f"    (cache: nuvem {step}h)")
+        return c["lons"], c["lats"], c["nuvem"], _iso_dt(c["valido"])
     g = f"{tmp_prefix}_tcc_{step}h.grib2"
     baixar("tcc", step, g, data_rodada, hora_rodada)
     lons, lats, arr = ler_grib(g, "tcc", 100.0, 0.0)
     valido = _valid_utc(g, "tcc")
     _remover(g)
-    return lons, lats, np.clip(arr, 0, 100), valido
+    arr = np.clip(arr, 0, 100)
+    _cache_save(cache_dir, "nuvem", dia, step, lons=lons, lats=lats,
+                nuvem=arr, valido=_dt_iso(valido))
+    return lons, lats, arr, valido
 
 
-def obter_temp(step, tmp_prefix, data_rodada=None, hora_rodada=0):
+def obter_temp(step, tmp_prefix, data_rodada=None, hora_rodada=0,
+               cache_dir=None, dia=None):
     """(lons, lats, tmin_C, tmax_C, valido). Mín e máx do dia a partir dos
     sub-passos de 2t (3 em 3 h até 144 h, 6 em 6 h depois). Baixa cada
     sub-passo UMA vez e atualiza mín e máx juntos."""
+    c = _cache_load(cache_dir, "temp", dia, step)
+    if c is not None:
+        print(f"    (cache: temperatura {step}h)")
+        return c["lons"], c["lats"], c["tmin"], c["tmax"], _iso_dt(c["valido"])
     passo = 3 if step <= 144 else 6
     ini = step - 24 + passo
     sub_steps = list(range(ini, step + 1, passo))
@@ -446,6 +605,8 @@ def obter_temp(step, tmp_prefix, data_rodada=None, hora_rodada=0):
             _remover(g)
     if tmin is None:
         raise RuntimeError("nenhum sub-passo de 2t disponível")
+    _cache_save(cache_dir, "temp", dia, step, lons=lons, lats=lats,
+                tmin=tmin, tmax=tmax, valido=_dt_iso(valido))
     return lons, lats, tmin, tmax, valido
 
 
@@ -463,9 +624,37 @@ def _caminho_poligono(regiao):
     return Path(verts, codes)
 
 
+def _add_logo(fig, ax, caminho, pos, escala, alpha):
+    """Sobrepõe a logo (PNG) num canto do mapa, preservando a proporção.
+    'escala' = largura da logo como fração da largura do eixo."""
+    import matplotlib.image as mpimg
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+    try:
+        img = mpimg.imread(caminho)
+    except Exception as e:
+        print(f"    (aviso: não consegui ler a logo {caminho}: {e})")
+        return
+    # largura desejada (px) = fração * largura do eixo (px)
+    ax_w_in = fig.get_size_inches()[0] * ax.get_position().width
+    alvo_px = max(escala * ax_w_in * fig.dpi, 1.0)
+    zoom = alvo_px / img.shape[1]
+    oi = OffsetImage(img, zoom=zoom, alpha=alpha)
+    cantos = {
+        "inferior-esquerda": (0.02, 0.02, (0.0, 0.0)),
+        "inferior-direita":  (0.98, 0.02, (1.0, 0.0)),
+        "superior-esquerda": (0.02, 0.98, (0.0, 1.0)),
+        "superior-direita":  (0.98, 0.98, (1.0, 1.0)),
+    }
+    x, y, ba = cantos.get(pos, cantos["inferior-direita"])
+    ab = AnnotationBbox(oi, (x, y), xycoords="axes fraction",
+                        box_alignment=ba, frameon=False, pad=0.0, zorder=10)
+    ax.add_artist(ab)
+
+
 def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
            cor_acima=None, cor_abaixo=None, extend="max",
-           extent=None, regiao=None, fundo=None, recortar=False, cidades=None):
+           extent=None, regiao=None, fundo=None, recortar=False, cidades=None,
+           logo=None, logo_pos="inferior-direita", logo_escala=0.16, logo_alpha=1.0):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -526,13 +715,16 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     for sp in ax.spines.values():
         sp.set_visible(True); sp.set_linewidth(1.0)
 
-    ax.set_title(titulo, loc="left", fontsize=20, fontweight="bold", pad=8)
-    ax.set_title(periodo_txt, loc="right", fontsize=20, fontweight="bold",
+    ax.set_title(titulo, loc="left", fontsize=16, fontweight="bold", pad=8)
+    ax.set_title(periodo_txt, loc="right", fontsize=16, fontweight="bold",
                  color="blue", pad=8)
 
     cb = fig.colorbar(cs, ax=ax, fraction=0.046, pad=0.02, ticks=ticks, extend=extend)
     cb.ax.tick_params(labelsize=15)
     cb.set_ticklabels(["%g" % t for t in ticks])
+
+    if logo:
+        _add_logo(fig, ax, logo, logo_pos, logo_escala, logo_alpha)
 
     fig.savefig(png_path, bbox_inches="tight", facecolor="white")
     plt.close(fig)
@@ -546,7 +738,15 @@ def _fmt_dia(d):
 
 
 def periodo_acumulado(base, dias):
-    return f"{_fmt_dia(base)} a {_fmt_dia(base + dt.timedelta(days=dias))}"
+    ini = base
+    fim = base + dt.timedelta(days=dias)
+    yy = str(fim.year)[2:]
+    if ini.year == fim.year and ini.month == fim.month:
+        return f"{ini.day} a {fim.day}/{MESES_PT[fim.month - 1]}/{yy}"
+    if ini.year == fim.year:
+        return (f"{ini.day}/{MESES_PT[ini.month - 1]} a "
+                f"{fim.day}/{MESES_PT[fim.month - 1]}/{yy}")
+    return f"{_fmt_dia(ini)} a {_fmt_dia(fim)}"
 
 
 def periodo_diario(base, dias):
@@ -569,7 +769,12 @@ def main():
                     help="uma ou mais regiões (nome/sigla/código). Ex.: --regiao SP MG")
     ap.add_argument("--regioes", default=None,
                     help="regiões separadas por ; (bom p/ nomes com espaço)")
-    ap.add_argument("--brasil", action="store_true", help="inclui o Brasil inteiro")
+    ap.add_argument("--sem-brasil", action="store_true",
+                    help="NÃO gerar o Brasil inteiro (por padrão ele é sempre gerado)")
+    ap.add_argument("--cache", default=".cache_ecmwf",
+                    help="pasta de cache do dia (evita rebaixar). Padrão: .cache_ecmwf")
+    ap.add_argument("--sem-cache", action="store_true",
+                    help="desliga o cache (baixa sempre)")
     ap.add_argument("--kml", required=True, nargs="+",
                     help="um ou mais KML (ex.: estados.kml mesorregioes.kml)")
     ap.add_argument("--fundo", nargs="*", default=None,
@@ -584,11 +789,23 @@ def main():
                     help="folga em graus ao redor da região no recorte da imagem")
     ap.add_argument("--recortar", action="store_true",
                     help="limita o preenchimento ao polígono da região")
+    ap.add_argument("--todas-meso", action="store_true",
+                    help="gera TODAS as mesorregiões (as regiões que não são fundo), "
+                         "em pastas <saida>/<UF>/<mesorregião>/")
     ap.add_argument("--cidades", default=None,
                     help="arquivo de cidades (CSV nome,lat,lon ou KML de pontos); "
                          "mostra as que caem dentro da região focada")
     ap.add_argument("--cidade", action="append", default=[],
                     help="ponto avulso 'Nome,lat,lon' (repetível); sempre desenhado")
+    ap.add_argument("--logo", default=None, help="PNG de logo para sobrepor ao mapa")
+    ap.add_argument("--logo-pos", default="inferior-direita",
+                    choices=["inferior-esquerda", "inferior-direita",
+                             "superior-esquerda", "superior-direita"],
+                    help="canto da logo (padrão: inferior-direita)")
+    ap.add_argument("--logo-escala", type=float, default=0.16,
+                    help="largura da logo como fração da largura do mapa (0..1)")
+    ap.add_argument("--logo-alpha", type=float, default=1.0,
+                    help="opacidade da logo (0..1)")
     args = ap.parse_args()
 
     vars_sel = list(dict.fromkeys(args.vars))  # únicas, mantendo ordem
@@ -596,8 +813,8 @@ def main():
     pedidos = list(args.regiao)
     if args.regioes:
         pedidos += [p.strip() for p in args.regioes.split(";") if p.strip()]
-    if not pedidos and not args.brasil:
-        sys.exit("Informe ao menos uma região (--regiao / --regioes) ou --brasil.")
+    if not pedidos and args.sem_brasil and not args.todas_meso:
+        sys.exit("Nada a gerar: sem regiões, --sem-brasil e sem --todas-meso.")
 
     existentes = [c for c in args.kml if os.path.exists(c)]
     for c in [c for c in args.kml if not os.path.exists(c)]:
@@ -644,32 +861,76 @@ def main():
         except ValueError as e:
             print(f"  AVISO: {e}")
 
-    alvos = []  # (sufixo, regiao|None, extent|None, cidades)
-    if args.brasil:
-        alvos.append(("brasil", None, None, list(cidades_cli)))
-        print("Alvo: Brasil inteiro (sem recorte)")
+    # logo (opcional): resolve uma vez; se faltar, segue sem
+    logo = None
+    if args.logo:
+        if os.path.exists(args.logo):
+            logo = args.logo
+            print(f"Logo: {args.logo} ({args.logo_pos})")
+        else:
+            print(f"  AVISO: logo não encontrada, seguindo sem: {args.logo}")
+
+    alvos = []  # (subdir, regiao|None, extent|None, cidades)
+
+    def _alvo_de_regiao(r):
+        lo0, la0, lo1, la1 = bbox_regiao(r)
+        m = args.margem
+        ext = (lo0 - m, lo1 + m, la0 - m, la1 + m)
+        cids = list(cidades_cli)
+        cids += [c for c in cidades_arquivo if ponto_na_regiao(c[2], c[1], r)]
+        sub = subdir_do_alvo(r, fundo_regioes)
+        return (sub, r, ext, cids)
+
+    if not args.sem_brasil:
+        # enquadra o Brasil no bbox dos estados (fundo) + margem, em vez do
+        # domínio inteiro que é baixado (que vai muito além do Brasil).
+        bb = bbox_uniao(fundo_regioes)
+        ext_br = None
+        if bb:
+            lo0, la0, lo1, la1 = bb
+            mb = max(args.margem, 1.5)
+            ext_br = (lo0 - mb, lo1 + mb, la0 - mb, la1 + mb)
+        alvos.append(("brasil", None, ext_br, list(cidades_cli)))
+        print("Alvo: Brasil inteiro (sempre)")
+
     for pedido in pedidos:
         r = selecionar_regiao(regioes, pedido)
         if r is None:
             exemplos = ", ".join(sorted(x["nome"] for x in regioes)[:12])
             print(f"  AVISO: região '{pedido}' não encontrada, pulando. Ex.: {exemplos} ...")
             continue
-        lo0, la0, lo1, la1 = bbox_regiao(r)
-        m = args.margem
-        ext = (lo0 - m, lo1 + m, la0 - m, la1 + m)
-        suf = _sem_acento(r["nome"]).replace(" ", "_").replace("/", "-")
-        # cidades do alvo: as avulsas (sempre) + as do arquivo dentro da região
-        cids = list(cidades_cli)
-        cids += [c for c in cidades_arquivo if ponto_na_regiao(c[2], c[1], r)]
-        alvos.append((suf, r, ext, cids))
-        print(f"Alvo: {r['nome']}  bbox={lo0:.2f},{la0:.2f}..{lo1:.2f},{la1:.2f}"
-              f"  cidades={len(cids)}")
+        sub, r, ext, cids = _alvo_de_regiao(r)
+        alvos.append((sub, r, ext, cids))
+        print(f"Alvo: {r['nome']} -> {sub}  cidades={len(cids)}")
+
+    if args.todas_meso:
+        # mesorregiões = tudo que NÃO é fundo (estado)
+        ids_fundo = {id(r) for r in fundo_regioes}
+        mesos = [r for r in regioes if id(r) not in ids_fundo]
+        print(f"Todas as mesorregiões: {len(mesos)}")
+        sem_uf = 0
+        for r in mesos:
+            sub, r, ext, cids = _alvo_de_regiao(r)
+            if sub.startswith("SEM_UF" + os.sep) or sub.startswith("SEM_UF/"):
+                sem_uf += 1
+            alvos.append((sub, r, ext, cids))
+        if sem_uf:
+            print(f"  AVISO: {sem_uf} mesorregião(ões) sem UF identificada "
+                  f"(foram para a pasta SEM_UF/).")
+
     if not alvos:
         sys.exit("Nenhum alvo válido — nada a gerar.")
 
     os.makedirs(args.saida, exist_ok=True)
-    tmp = os.path.join(args.saida, "_tmp")
+    cache_dir = None if args.sem_cache else args.cache
+    if cache_dir:
+        os.makedirs(cache_dir, exist_ok=True)
+    dia_cache = dt.datetime.utcnow().date().isoformat()   # dado "do dia" (UTC)
+    tmp = os.path.join(cache_dir or args.saida, "_tmp")
     rodada_hoje = dt.date.today()
+
+    if cache_dir:
+        print(f"Cache: {cache_dir} (dia {dia_cache}) — não rebaixa o que já tem")
 
     print(f"Variáveis: {', '.join(vars_sel)} | dias: {sorted(set(args.dias))} | "
           f"alvos: {len(alvos)}")
@@ -686,7 +947,7 @@ def main():
         if "chuva" in vars_sel:
             print(f"[{dias}d] baixando CHUVA (tp) 1x...")
             try:
-                lo, la, acum, diario, valido = obter_chuva(step, tmp)
+                lo, la, acum, diario, valido = obter_chuva(step, tmp, cache_dir=cache_dir, dia=dia_cache)
                 lons, lats = lo, la
                 base = _base_do_valido(valido, dias, rodada_hoje)
                 produtos.append(("chuva_acumulado", acum, "Acumulado (mm)",
@@ -701,7 +962,7 @@ def main():
         if "tmin" in vars_sel or "tmax" in vars_sel:
             print(f"[{dias}d] baixando TEMPERATURA (2t, sub-passos) 1x...")
             try:
-                lo, la, tmin, tmax, valido = obter_temp(step, tmp)
+                lo, la, tmin, tmax, valido = obter_temp(step, tmp, cache_dir=cache_dir, dia=dia_cache)
                 lons, lats = lo, la
                 base = _base_do_valido(valido, dias, rodada_hoje)
                 if "tmin" in vars_sel:
@@ -718,7 +979,7 @@ def main():
         if "nuvem" in vars_sel:
             print(f"[{dias}d] baixando NUVEM (tcc) 1x...")
             try:
-                lo, la, nuvem, valido = obter_nuvem(step, tmp)
+                lo, la, nuvem, valido = obter_nuvem(step, tmp, cache_dir=cache_dir, dia=dia_cache)
                 lons, lats = lo, la
                 base = _base_do_valido(valido, dias, rodada_hoje)
                 produtos.append(("nuvem", nuvem, "Nuvens (%)",
@@ -732,14 +993,18 @@ def main():
             continue
 
         # mesmo dado, vários recortes
-        for (suf, regiao, extent, cids) in alvos:
+        for (subdir, regiao, extent, cids) in alvos:
+            outdir = os.path.join(args.saida, subdir)
+            os.makedirs(outdir, exist_ok=True)
             for (tipo, campo, titulo, per, faixas, c_a, c_b, ext_cb) in produtos:
-                png = os.path.join(args.saida, f"ecmwf_{tipo}_{suf}_{dias}d.png")
+                png = os.path.join(outdir, f"ecmwf_{tipo}_{dias}d.png")
                 plotar(lons, lats, campo, titulo, per, png, faixas,
                        cor_acima=c_a, cor_abaixo=c_b, extend=ext_cb,
                        extent=extent, regiao=regiao, fundo=fundo_regioes,
-                       recortar=args.recortar, cidades=cids)
-                print(f"  gerado: {png}")
+                       recortar=args.recortar, cidades=cids,
+                       logo=logo, logo_pos=args.logo_pos,
+                       logo_escala=args.logo_escala, logo_alpha=args.logo_alpha)
+        print(f"  {dias}d: {len(alvos)} alvo(s) x {len(produtos)} produto(s) gerado(s)")
 
     for fn in os.listdir(args.saida):
         if fn.startswith("_tmp"):

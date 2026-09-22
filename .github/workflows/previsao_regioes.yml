@@ -1,0 +1,104 @@
+name: previsao-regioes
+
+# Como usar:
+#  - Manual (aba Actions > Run workflow): digite as regiões, o KML e os dias.
+#  - Automático: roda todo dia no horário do cron abaixo com a lista padrão.
+#
+# Requer que o KML (ex.: estados.kml) e o gerar_previsao_regiao.py estejam
+# na raiz do repositório. As figuras vão para a pasta previsao_regioes/ e são
+# commitadas de volta.
+
+on:
+  workflow_dispatch:
+    inputs:
+      regioes:
+        description: "Regiões (nome ou sigla) separadas por ; — ex.: SP;MG;GO;BRASIL"
+        required: false
+        default: "SP;MG;GO;MT;BA"
+      kml:
+        description: "KML(s) separados por espaço (estados e/ou mesorregiões)"
+        required: false
+        default: "estados.kml mesorregioes.kml"
+      dias:
+        description: "Horizontes em dias"
+        required: false
+        default: "1 2 3 4 5 6 7"
+      recortar:
+        description: "Recortar o preenchimento ao polígono? (sim/nao)"
+        required: false
+        default: "nao"
+  schedule:
+    # 09:00 UTC = ~06:00 Brasília, depois de a rodada 00z do ECMWF ficar pronta.
+    - cron: "0 9 * * *"
+
+# necessário para o GITHUB_TOKEN conseguir commitar de volta no repositório
+permissions:
+  contents: write
+
+# evita duas execuções simultâneas empurrando commits ao mesmo tempo
+concurrency:
+  group: previsao-regioes
+  cancel-in-progress: false
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: eccodes (para o cfgrib ler GRIB)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeccodes0
+          # Alternativa sem apt, se algum dia mudar o nome do pacote:
+          #   pip install ecmwflibs
+
+      - name: dependências python
+        run: |
+          python -m pip install --upgrade pip
+          pip install ecmwf-opendata xarray cfgrib numpy matplotlib
+
+      - name: gerar figuras
+        env:
+          REGIOES:  ${{ github.event.inputs.regioes  || 'SP;MG;GO;MT;BA' }}
+          KML:      ${{ github.event.inputs.kml      || 'estados.kml mesorregioes.kml' }}
+          DIAS:     ${{ github.event.inputs.dias     || '1 2 3 4 5 6 7' }}
+          RECORTAR: ${{ github.event.inputs.recortar || 'nao' }}
+        run: |
+          set -e
+          FLAG_RECORTE=""
+          if [ "$RECORTAR" = "sim" ]; then FLAG_RECORTE="--recortar"; fi
+
+          IFS=';' read -ra LISTA <<< "$REGIOES"
+          for R in "${LISTA[@]}"; do
+            R_TRIM="$(echo "$R" | xargs)"          # tira espaços das pontas
+            [ -z "$R_TRIM" ] && continue
+            echo ">>> gerando: $R_TRIM"
+            if [ "$(echo "$R_TRIM" | tr '[:lower:]' '[:upper:]')" = "BRASIL" ]; then
+              python gerar_previsao_regiao.py --brasil --kml $KML \
+                --dias $DIAS --saida previsao_regioes $FLAG_RECORTE
+            else
+              python gerar_previsao_regiao.py --regiao "$R_TRIM" --kml $KML \
+                --dias $DIAS --saida previsao_regioes $FLAG_RECORTE
+            fi
+          done
+
+      - name: commit e push (à prova de conflito)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add previsao_regioes
+          if git diff --cached --quiet; then
+            echo "Sem mudanças para commitar."; exit 0
+          fi
+          git commit -m "previsão por região $(date -u +%Y-%m-%dT%H:%MZ)"
+          # tenta empurrar rebaseando por cima de commits que chegaram no meio
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" \
+              && git push && exit 0 || (echo "retry $i..."; sleep 5)
+          done
+          echo "Falhou ao dar push após 5 tentativas."; exit 1

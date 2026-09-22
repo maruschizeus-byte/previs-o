@@ -29,8 +29,8 @@ on:
         type: boolean
         default: false
   schedule:
-    # 09:00 UTC = ~06:00 Brasília, após a rodada 00z do ECMWF.
-    - cron: "0 9 * * *"
+    # 06:05 de Brasília (BRT = UTC-3, sem horário de verão) = 09:05 UTC, todo dia.
+    - cron: "5 9 * * *"
 
 permissions:
   contents: write
@@ -81,7 +81,7 @@ jobs:
           # (padrão do script: aws azure ecmwf).
           if [ "$TODAS" = "true" ] || [ -z "$REGIOES" ]; then
             python -u gerar_previsao_regiao.py \
-              --todas-meso \
+              --todas-meso --todos-estados \
               --kml estados.kml mesorregioes.kml \
               --fundo estados.kml \
               --logo logo.png \

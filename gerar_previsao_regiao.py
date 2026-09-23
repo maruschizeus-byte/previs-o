@@ -22,7 +22,10 @@ USO
     python gerar_previsao_regiao.py --regioes "SP;MG;3105" \
         --kml estados.kml mesorregioes.kml --vars chuva tmin tmax nuvem
     python gerar_previsao_regiao.py --regiao SP --kml estados.kml --vars chuva
-    python gerar_previsao_regiao.py --brasil --kml estados.kml --dias 1 2 3
+    python gerar_previsao_regiao.py --kml estados.kml --dias 1 2 3
+    python gerar_previsao_regiao.py --todas-meso --todos-estados \
+        --kml estados.kml mesorregioes.kml --fundo estados.kml \
+        --kml-meso mesorregioes.kml --somente-estrutura
 
 A busca da região casa (sem acento/caixa) contra o <name> do Placemark e
 contra qualquer campo de ExtendedData (SimpleData/Data) — então nome, sigla
@@ -32,6 +35,7 @@ ou CÓDIGO IBGE funcionam se estiverem no KML.
 import os
 import sys
 import time
+import json
 import argparse
 import unicodedata
 import datetime as dt
@@ -153,6 +157,10 @@ def _parse_coords(texto):
     return pontos
 
 
+def _caminho_kml(caminho):
+    return os.path.normcase(os.path.realpath(os.path.expanduser(caminho)))
+
+
 def ler_kml(caminho):
     """Lista de regiões: {'nome','chaves'(set),'poligonos'(list),'arquivo'}."""
     tree = ET.parse(caminho)
@@ -206,9 +214,25 @@ def ler_kml(caminho):
                     poligonos.append(pts)
 
         if poligonos:
-            regioes.append({"nome": nome or "(sem nome)", "chaves": chaves,
+            # Exportações do QGIS/IBGE podem ter um nome genérico no Placemark.
+            # O nome oficial da mesorregião evita pastas repetidas/sem nome.
+            for campo in ("nm_meso", "nm_mesorregiao", "nome_meso", "mesorregiao"):
+                if campos.get(campo):
+                    nome = campos[campo]
+                    break
+            if not nome:
+                for campo in ("nm_uf", "nome", "name", "cd_meso", "cd_geocme"):
+                    if campos.get(campo):
+                        nome = campos[campo]
+                        break
+            if not nome:
+                raise ValueError(f"Polígono sem nome ou código em {caminho}. "
+                                 "Preencha o nome de cada região no KML.")
+            chaves.add(_sem_acento(nome))
+            regioes.append({"nome": nome, "chaves": chaves,
                             "campos": campos, "poligonos": poligonos,
-                            "arquivo": os.path.basename(caminho)})
+                            "arquivo": os.path.basename(caminho),
+                            "caminho": _caminho_kml(caminho)})
     return regioes
 
 
@@ -217,8 +241,52 @@ def ler_kmls(caminhos):
     for c in caminhos:
         lidas = ler_kml(c)
         print(f"KML: {len(lidas)} região(ões) em {c}")
+        if not lidas:
+            raise ValueError(f"Nenhum polígono de região encontrado em {c}. "
+                             "Use um KML com Placemarks e polígonos; "
+                             "pontos ou links para outros arquivos não bastam.")
         todas.extend(lidas)
     return todas
+
+
+def carregar_geografia(caminhos, caminhos_fundo=None, caminhos_meso=None):
+    """Valida os arquivos e identifica estados/mesorregiões independentemente."""
+    fundo = {_caminho_kml(c) for c in (caminhos_fundo or [])}
+    meso = {_caminho_kml(c) for c in (caminhos_meso or [])}
+    if fundo & meso:
+        raise ValueError("O mesmo KML foi indicado em --fundo e --kml-meso. "
+                         "Informe arquivos separados para estados e mesorregiões.")
+    arquivos = list(dict.fromkeys(_caminho_kml(c) for c in
+                    list(caminhos) + list(caminhos_fundo or []) +
+                    list(caminhos_meso or [])))
+    ausentes = [c for c in arquivos if not os.path.isfile(c)]
+    if ausentes:
+        raise ValueError("KML não encontrado: " + "; ".join(ausentes) +
+                         ". Confira o caminho e as letras maiúsculas/minúsculas "
+                         "no repositório. Nenhuma região será ignorada.")
+    regioes = ler_kmls(arquivos)
+    estados, mesos = [], []
+    campos_meso = ("cd_meso", "cd_geocme", "cd_mesorregiao", "nm_meso",
+                   "nm_mesorregiao", "nome_meso", "mesorregiao")
+    for r in regioes:
+        origem = r["caminho"]
+        nome = _sem_acento(r["nome"])
+        arquivo = _sem_acento(r["arquivo"])
+        if origem in meso:
+            tipo = "mesorregiao"
+        elif origem in fundo:
+            tipo = "estado"
+        elif any(r["campos"].get(c) for c in campos_meso) or "meso" in arquivo:
+            tipo = "mesorregiao"
+        elif ("estado" in arquivo or nome in UF_NOME2SIGLA or
+              r["nome"].upper() in UF_COD2SIGLA.values()):
+            tipo = "estado"
+        else:
+            tipo = "mesorregiao"
+        r["tipo"] = tipo
+        (estados if tipo == "estado" else mesos).append(r)
+    print(f"Geografia: {len(estados)} estado(s), {len(mesos)} mesorregião(ões).")
+    return regioes, estados, mesos
 
 
 def selecionar_regiao(regioes, alvo):
@@ -290,13 +358,13 @@ def uf_sigla(regiao, estados=None):
     c = regiao.get("campos", {})
     for k in ("sigla_uf", "sigla", "uf", "cd_uf_sigla"):
         v = c.get(k, "").strip()
-        if len(v) == 2 and v.isalpha():
+        if v.upper() in UF_COD2SIGLA.values():
             return v.upper()
     for k in ("nm_uf", "nome_uf", "estado", "nm_estado", "name_uf"):
         s = UF_NOME2SIGLA.get(_sem_acento(c.get(k, "")))
         if s:
             return s
-    for k in ("cd_uf", "cd_geocuf", "cd_meso", "geocodigo", "codigo",
+    for k in ("cd_uf", "uf", "cd_geocuf", "cd_meso", "geocodigo", "codigo",
               "cd_geocme", "cd_mesorregiao", "cd_rgint"):
         v = c.get(k, "").strip()
         if len(v) >= 2 and v[:2].isdigit():
@@ -307,6 +375,8 @@ def uf_sigla(regiao, estados=None):
     s = UF_NOME2SIGLA.get(_sem_acento(regiao.get("nome", "")))
     if s:
         return s
+    if regiao.get("nome", "").upper() in UF_COD2SIGLA.values():
+        return regiao["nome"].upper()
     # geometria: centro da região dentro de um estado do fundo
     if estados:
         clon, clat = _centro_bbox(regiao)
@@ -328,10 +398,49 @@ def subdir_do_alvo(regiao, estados):
     if regiao is None:
         return "brasil"
     ids_estados = {id(r) for r in (estados or [])}
-    if id(regiao) in ids_estados:               # é um estado
+    if (regiao.get("tipo") == "estado" or
+            (not regiao.get("tipo") and id(regiao) in ids_estados)):
         return uf_sigla(regiao, estados) or _pasta_segura(regiao["nome"])
     uf = uf_sigla(regiao, estados) or "SEM_UF"  # é mesorregião
     return os.path.join(uf, _pasta_segura(regiao["nome"]))
+
+
+def preparar_pastas(alvos, saida, estados):
+    """Deduplica alvos, detecta colisões e registra as pastas antes do download."""
+    unicos = {}
+    for alvo in alvos:
+        sub, regiao, _extent, _cidades = alvo
+        chave = unicodedata.normalize("NFC", sub).casefold()
+        anterior = unicos.get(chave)
+        if anterior is not None:
+            if anterior[1] is regiao:
+                continue
+            raise ValueError(f"Regiões diferentes gerariam a mesma pasta: {sub}. "
+                             "Use nomes únicos para as mesorregiões no KML.")
+        unicos[chave] = alvo
+    registros = []
+    for sub, regiao, _extent, _cidades in unicos.values():
+        pasta = os.path.join(saida, sub)
+        os.makedirs(pasta, exist_ok=True)
+        registro = {
+            "nome": regiao["nome"] if regiao else "Brasil",
+            "tipo": regiao["tipo"] if regiao else "brasil",
+            "uf": uf_sigla(regiao, estados) if regiao else None,
+            "arquivo_kml": regiao["arquivo"] if regiao else None,
+            "pasta": sub.replace(os.sep, "/"),
+        }
+        # O Git não versiona pastas vazias. Este arquivo identifica a região;
+        # sua presença não significa que os mapas já foram atualizados.
+        with open(os.path.join(pasta, "regiao.json"), "w", encoding="utf-8") as fp:
+            json.dump(registro, fp, ensure_ascii=False, indent=2)
+            fp.write("\n")
+        registros.append(registro)
+        print(f"Pasta: {registro['tipo']} | {registro['nome']} -> {pasta}")
+    with open(os.path.join(saida, "regioes.json"), "w", encoding="utf-8") as fp:
+        json.dump({"total": len(registros), "regioes": registros}, fp,
+                  ensure_ascii=False, indent=2)
+        fp.write("\n")
+    return list(unicos.values())
 
 
 # =========================================================================
@@ -640,9 +749,10 @@ def _caminho_poligono(regiao):
     return Path(verts, codes)
 
 
-def _add_logo(fig, ax, caminho, pos, escala, alpha):
+def _add_logo(fig, ax, caminho, pos, escala, alpha, fundo=True):
     """Sobrepõe a logo (PNG) num canto do mapa, preservando a proporção.
-    'escala' = largura da logo como fração da largura do eixo."""
+    'escala' = largura da logo como fração da largura do eixo.
+    'fundo'  = desenha uma caixa branca atrás (útil p/ logo com transparência)."""
     import matplotlib.image as mpimg
     from matplotlib.offsetbox import OffsetImage, AnnotationBbox
     try:
@@ -650,7 +760,6 @@ def _add_logo(fig, ax, caminho, pos, escala, alpha):
     except Exception as e:
         print(f"    (aviso: não consegui ler a logo {caminho}: {e})")
         return
-    # largura desejada (px) = fração * largura do eixo (px)
     ax_w_in = fig.get_size_inches()[0] * ax.get_position().width
     alvo_px = max(escala * ax_w_in * fig.dpi, 1.0)
     zoom = alvo_px / img.shape[1]
@@ -662,15 +771,18 @@ def _add_logo(fig, ax, caminho, pos, escala, alpha):
         "superior-direita":  (0.98, 0.98, (1.0, 1.0)),
     }
     x, y, ba = cantos.get(pos, cantos["inferior-direita"])
+    bboxprops = dict(facecolor="white", edgecolor="#c8c8c8", linewidth=0.8) if fundo else None
     ab = AnnotationBbox(oi, (x, y), xycoords="axes fraction",
-                        box_alignment=ba, frameon=False, pad=0.0, zorder=10)
+                        box_alignment=ba, frameon=fundo, pad=0.5,
+                        bboxprops=bboxprops, zorder=10)
     ax.add_artist(ab)
 
 
 def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
            cor_acima=None, cor_abaixo=None, extend="max",
            extent=None, regiao=None, fundo=None, recortar=False, cidades=None,
-           logo=None, logo_pos="inferior-direita", logo_escala=0.16, logo_alpha=1.0):
+           logo=None, logo_pos="inferior-direita", logo_escala=0.16, logo_alpha=1.0,
+           logo_fundo=True):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -740,7 +852,7 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     cb.set_ticklabels(["%g" % t for t in ticks])
 
     if logo:
-        _add_logo(fig, ax, logo, logo_pos, logo_escala, logo_alpha)
+        _add_logo(fig, ax, logo, logo_pos, logo_escala, logo_alpha, fundo=logo_fundo)
 
     fig.savefig(png_path, bbox_inches="tight", facecolor="white")
     plt.close(fig)
@@ -798,6 +910,8 @@ def main():
                     help="desliga o cache (baixa sempre)")
     ap.add_argument("--kml", required=True, nargs="+",
                     help="um ou mais KML (ex.: estados.kml mesorregioes.kml)")
+    ap.add_argument("--kml-meso", nargs="+", default=None,
+                    help="KML(s) que contêm as mesorregiões; identificação explícita")
     ap.add_argument("--fundo", nargs="*", default=None,
                     help="KML(s) usados como contorno de fundo. Padrão: os que "
                          "tiverem 'estado' no nome do arquivo.")
@@ -815,10 +929,13 @@ def main():
     ap.add_argument("--recortar", action="store_true",
                     help="limita o preenchimento ao polígono da região")
     ap.add_argument("--todas-meso", action="store_true",
-                    help="gera TODAS as mesorregiões (as regiões que não são fundo), "
+                    help="gera TODAS as mesorregiões identificadas, "
                          "em pastas <saida>/<UF>/<mesorregião>/")
     ap.add_argument("--todos-estados", action="store_true",
                     help="gera também cada estado como figura própria, em <saida>/<UF>/")
+    ap.add_argument("--somente-estrutura", action="store_true",
+                    help="valida os KMLs e cria as pastas com sua identificação, "
+                         "sem baixar previsão nem gerar mapas")
     ap.add_argument("--cidades", default=None,
                     help="arquivo de cidades (CSV nome,lat,lon ou KML de pontos); "
                          "mostra as que caem dentro da região focada")
@@ -833,6 +950,8 @@ def main():
                     help="largura da logo como fração da largura do mapa (0..1)")
     ap.add_argument("--logo-alpha", type=float, default=1.0,
                     help="opacidade da logo (0..1)")
+    ap.add_argument("--logo-sem-fundo", action="store_true",
+                    help="não desenhar a caixa branca atrás da logo")
     args = ap.parse_args()
 
     vars_sel = list(dict.fromkeys(args.vars))  # únicas, mantendo ordem
@@ -848,35 +967,24 @@ def main():
     if not pedidos and args.sem_brasil and not args.todas_meso and not args.todos_estados:
         sys.exit("Nada a gerar: sem regiões, --sem-brasil e sem --todas-meso/--todos-estados.")
 
-    existentes = [c for c in args.kml if os.path.exists(c)]
-    for c in [c for c in args.kml if not os.path.exists(c)]:
-        print(f"  AVISO: KML não encontrado, ignorando: {c}")
-    if not existentes:
-        sys.exit(f"Nenhum KML encontrado entre [{', '.join(args.kml)}] "
-                 f"(pasta atual: {os.getcwd()}). Confira o caminho relativo "
-                 f"à raiz do repositório.")
-
-    regioes = ler_kmls(existentes)
-    if not regioes:
-        sys.exit(f"Nenhum polígono lido de {', '.join(existentes)}")
+    try:
+        regioes, fundo_regioes, mesos = carregar_geografia(
+            args.kml, args.fundo, args.kml_meso)
+    except (ValueError, OSError, ET.ParseError) as e:
+        sys.exit(f"ERRO nos KMLs: {e}")
     print(f"Total: {len(regioes)} região(ões) disponível(is) para busca")
-
-    # camada de FUNDO (contexto): só os estados. Por padrão, os arquivos com
-    # 'estado' no nome; ou os informados em --fundo. A busca continua usando
-    # TODAS as regiões (estados + mesorregiões).
-    if args.fundo:
-        bases_fundo = {os.path.basename(c) for c in args.fundo}
-        fundo_regioes = [r for r in regioes if r["arquivo"] in bases_fundo]
-    else:
-        fundo_regioes = [r for r in regioes if "estado" in _sem_acento(r["arquivo"])]
-    if not fundo_regioes:
-        print("  AVISO: nenhum KML de fundo identificado — usando todos como fundo. "
-              "(informe --fundo estados.kml para desenhar só os estados)")
-        fundo_regioes = regioes
-    else:
+    if args.todas_meso and not mesos:
+        sys.exit("ERRO: nenhuma mesorregião identificada. Confira o conteúdo de "
+                 "mesorregioes.kml e use --kml-meso mesorregioes.kml. "
+                 "O arquivo deve conter um Placemark com polígono por região.")
+    if args.todos_estados and not fundo_regioes:
+        sys.exit("ERRO: nenhum estado identificado. Informe --fundo estados.kml.")
+    if fundo_regioes:
         arqs = sorted({r["arquivo"] for r in fundo_regioes})
         print(f"Fundo (contorno de estados): {', '.join(arqs)} "
               f"({len(fundo_regioes)} polígono(s))")
+    else:
+        print("Fundo: sem estados. As mesorregiões mantêm sua classificação.")
 
     # cidades de referência
     cidades_arquivo = []
@@ -916,7 +1024,7 @@ def main():
     if not args.sem_brasil:
         # enquadra o Brasil no bbox dos estados (fundo) + margem, em vez do
         # domínio inteiro que é baixado (que vai muito além do Brasil).
-        bb = bbox_uniao(fundo_regioes)
+        bb = bbox_uniao(fundo_regioes or regioes)
         ext_br = None
         if bb:
             lo0, la0, lo1, la1 = bb
@@ -942,9 +1050,6 @@ def main():
             alvos.append((sub, r, ext, cids))
 
     if args.todas_meso:
-        # mesorregiões = tudo que NÃO é fundo (estado)
-        ids_fundo = {id(r) for r in fundo_regioes}
-        mesos = [r for r in regioes if id(r) not in ids_fundo]
         print(f"Todas as mesorregiões: {len(mesos)}")
         sem_uf = 0
         for r in mesos:
@@ -959,7 +1064,16 @@ def main():
     if not alvos:
         sys.exit("Nenhum alvo válido — nada a gerar.")
 
-    os.makedirs(args.saida, exist_ok=True)
+    try:
+        alvos = preparar_pastas(alvos, args.saida, fundo_regioes)
+    except (ValueError, OSError) as e:
+        sys.exit(f"ERRO ao preparar pastas: {e}")
+    total_mesos = sum(1 for _, r, _, _ in alvos if r and r["tipo"] == "mesorregiao")
+    print(f"Estrutura validada: {len(alvos)} pasta(s), "
+          f"incluindo {total_mesos} mesorregião(ões).")
+    if args.somente_estrutura:
+        print("Somente estrutura: nenhum download ou mapa foi gerado.")
+        return
     cache_dir = None if args.sem_cache else args.cache
     if cache_dir:
         os.makedirs(cache_dir, exist_ok=True)
@@ -1061,7 +1175,8 @@ def main():
                        extent=extent, regiao=regiao, fundo=fundo_regioes,
                        recortar=args.recortar, cidades=cids,
                        logo=logo, logo_pos=args.logo_pos,
-                       logo_escala=args.logo_escala, logo_alpha=args.logo_alpha)
+                       logo_escala=args.logo_escala, logo_alpha=args.logo_alpha,
+                       logo_fundo=not args.logo_sem_fundo)
                 total += 1
                 if total % 50 == 0 or total == total_esperado:
                     seg = time.time() - inicio

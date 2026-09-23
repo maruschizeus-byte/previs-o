@@ -6,10 +6,14 @@ Gera figuras de previsão do ECMWF (Open Data) no estilo do painel "Total (mm)"
 MESORREGIÃO lido de arquivo(s) KML.
 
 Variáveis (escolha com --vars):
-  chuva : precipitação — gera ACUMULADO (desde a rodada) e do DIA (desacumulado)
-  tmin  : temperatura MÍNIMA do dia a 2 m (°C)   — útil p/ geada
-  tmax  : temperatura MÁXIMA do dia a 2 m (°C)
-  nuvem : cobertura total de nuvens (%)
+  chuva : precipitação — acumulado desde hoje 00 h e total de cada dia
+  tmin  : temperatura mínima estimada do dia a 2 m (°C)
+  tmax  : temperatura máxima estimada do dia a 2 m (°C)
+  nuvem : média diária da cobertura total de nuvens (%)
+
+Todos os dias usam 00 h a 00 h seguinte em America/Sao_Paulo (Brasília).
+--dias 0 1 2 3 4 5 6 7 inclui hoje e os sete dias seguintes. Os estados são
+sempre gerados. As mesorregiões mostram as cidades do CSV informado.
 
 Estratégia: para cada horizonte (dia), o dado do ECMWF é baixado UMA vez e
 depois recortado para TODAS as regiões pedidas. Mín e máx de temperatura saem
@@ -36,21 +40,28 @@ import os
 import sys
 import time
 import json
+import hashlib
+import math
 import argparse
 import unicodedata
 import datetime as dt
 import xml.etree.ElementTree as ET
+from zoneinfo import ZoneInfo
 
 import numpy as np
 
 # =========================================================================
 # CONFIGURAÇÕES
 # =========================================================================
-STEPS_PADRAO = [24, 48, 72, 96, 120, 144, 168]  # 1..7 dias, em horas
+BRASILIA = ZoneInfo("America/Sao_Paulo")
+UTC = dt.timezone.utc
+DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
+STEPS_ECMWF = tuple(range(0, 145, 3)) + tuple(range(150, 361, 6))
+CIDADES_PADRAO = "Cidades_principais_137_mesorregioes_Brasil.csv"
 
-# Domínio máximo baixado do ECMWF (América do Sul). O recorte da REGIÃO é só no
-# desenho; sempre baixamos o domínio todo para reaproveitar o dado entre regiões.
-LON_MIN, LON_MAX = -82.0, -30.0
+# Domínio de reserva. O domínio efetivo cobre todos os enquadramentos + borda.
+# Os campos globais são baixados uma vez por parâmetro/passo e recortados ao ler.
+LON_MIN, LON_MAX = -82.0, -25.0
 LAT_MIN, LAT_MAX = -60.0, 15.0
 
 MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun",
@@ -448,7 +459,7 @@ def preparar_pastas(alvos, saida, estados):
 # =========================================================================
 def ler_cidades(caminho):
     """Lê pontos de cidade de um CSV (nome,lat,lon) ou de um KML de pontos.
-    Retorna lista [(nome, lat, lon)]."""
+    Retorna dicionários com nome, lat, lon e identificação da mesorregião."""
     if caminho.lower().endswith(".kml"):
         return _ler_cidades_kml(caminho)
     return _ler_cidades_csv(caminho)
@@ -476,50 +487,86 @@ def _ler_cidades_kml(caminho):
                 pts = _parse_coords(coords.text)
                 if pts:
                     lon, lat = pts[0]
-                    cidades.append((nome or "(cidade)", lat, lon))
+                    cidades.append({"nome": nome or "(cidade)", "lat": lat, "lon": lon})
     return cidades
+
+
+def _cabecalho_cidade(nome):
+    return "".join(c for c in _sem_acento(nome) if c.isalnum())
 
 
 def _ler_cidades_csv(caminho):
     import csv
-    cidades = []
-    with open(caminho, encoding="utf-8-sig") as fp:
-        amostra = fp.read(2048)
+    with open(caminho, encoding="utf-8-sig", newline="") as fp:
+        amostra = fp.read(4096)
         fp.seek(0)
         delim = ";" if amostra.count(";") > amostra.count(",") else ","
-        leitor = csv.reader(fp, delimiter=delim)
-        linhas = [ln for ln in leitor if ln]
+        linhas = [ln for ln in csv.reader(fp, delimiter=delim) if any(v.strip() for v in ln)]
     if not linhas:
-        return cidades
-
-    # detecta cabeçalho e a ordem das colunas
-    cab = [c.strip().lower() for c in linhas[0]]
-    def _idx(cands):
-        for i, c in enumerate(cab):
-            if c in cands:
-                return i
-        return None
-    i_nome = _idx({"nome", "name", "cidade", "municipio", "município"})
-    i_lat = _idx({"lat", "latitude", "y"})
-    i_lon = _idx({"lon", "lng", "long", "longitude", "x"})
-    tem_cab = None not in (i_lat, i_lon)
-    dados = linhas[1:] if tem_cab else linhas
+        raise ValueError(f"CSV de cidades vazio: {caminho}")
+    cab = [_cabecalho_cidade(c) for c in linhas[0]]
+    def indice(*nomes):
+        return next((i for i, c in enumerate(cab) if c in nomes), None)
+    i_lat = indice("lat", "latitude", "y")
+    i_lon = indice("lon", "lng", "long", "longitude", "x")
+    tem_cab = i_lat is not None and i_lon is not None
+    i_nome = indice("nome", "name", "cidade", "municipio", "cidadeprincipal") if tem_cab else 0
+    i_cod = indice("cdmeso", "codmesorregiao", "codigomesorregiao", "cdgeocme", "cdmesorregiao", "idmesorregiao") if tem_cab else None
+    i_meso = indice("mesorregiao", "nmmeso", "nomemesorregiao") if tem_cab else None
+    i_uf = indice("uf", "siglauf") if tem_cab else None
     if not tem_cab:
-        i_nome, i_lat, i_lon = 0, 1, 2  # ordem assumida: nome,lat,lon
-
-    for ln in dados:
+        i_lat, i_lon = 1, 2
+    def celula(linha, i):
+        return linha[i].strip() if i is not None and i < len(linha) else ""
+    cidades = []
+    for num, ln in enumerate(linhas[1:] if tem_cab else linhas, 2 if tem_cab else 1):
         try:
-            nome = ln[i_nome].strip() if i_nome is not None and i_nome < len(ln) else "(cidade)"
-            lat = float(str(ln[i_lat]).replace(",", "."))
-            lon = float(str(ln[i_lon]).replace(",", "."))
-            cidades.append((nome, lat, lon))
-        except (ValueError, IndexError):
-            continue
+            lat = float(celula(ln, i_lat).replace(",", "."))
+            lon = float(celula(ln, i_lon).replace(",", "."))
+            nome = celula(ln, i_nome)
+            if not nome or not -90 <= lat <= 90 or not -180 <= lon <= 180:
+                raise ValueError("nome ou coordenadas inválidos")
+        except (ValueError, IndexError) as e:
+            raise ValueError(f"Cidade inválida na linha {num} de {caminho}: {e}") from e
+        codigo = celula(ln, i_cod)
+        if codigo.endswith(".0"):
+            codigo = codigo[:-2]
+        cidades.append({"nome": nome, "lat": lat, "lon": lon, "cd_meso": codigo,
+                        "mesorregiao": celula(ln, i_meso), "uf": celula(ln, i_uf).upper()})
     return cidades
 
 
+def codigo_mesorregiao(regiao):
+    for chave in ("cd_meso", "cd_geocme", "cd_mesorregiao", "codigo_mesorregiao", "geocodigo", "codigo"):
+        codigo = regiao.get("campos", {}).get(chave, "").strip()
+        if codigo.endswith(".0"):
+            codigo = codigo[:-2]
+        if len(codigo) == 4 and codigo.isdigit():
+            return codigo
+    nome = regiao.get("nome", "").strip()
+    return nome if len(nome) == 4 and nome.isdigit() else None
+
+
+def cidades_da_mesorregiao(regiao, cidades, estados):
+    if regiao.get("tipo") != "mesorregiao":
+        return []
+    codigo = codigo_mesorregiao(regiao)
+    candidatas = [c for c in cidades if codigo and c.get("cd_meso") == codigo]
+    if not candidatas:
+        uf = uf_sigla(regiao, estados)
+        candidatas = [c for c in cidades if c.get("mesorregiao") and
+                      _sem_acento(c["mesorregiao"]) == _sem_acento(regiao["nome"]) and
+                      (not uf or not c.get("uf") or c["uf"] == uf)]
+    if not candidatas:
+        candidatas = [c for c in cidades if ponto_na_regiao(c["lon"], c["lat"], regiao)]
+    if not candidatas:
+        raise ValueError(f"Nenhuma cidade de referência para {regiao['nome']} "
+                         f"(código {codigo or 'não informado'}). Confira o CSV de cidades.")
+    return list({(c["nome"], c["lat"], c["lon"]): c for c in candidatas}.values())
+
+
 def _parse_cidade_cli(txt):
-    """'Nome,lat,lon' -> (nome, lat, lon). Nome pode ter vírgula: os DOIS
+    """'Nome,lat,lon' -> dicionário de cidade. Nome pode ter vírgula: os DOIS
     últimos campos são lat e lon."""
     partes = [p.strip() for p in txt.split(",")]
     if len(partes) < 3:
@@ -527,7 +574,7 @@ def _parse_cidade_cli(txt):
     lon = float(partes[-1].replace(",", "."))
     lat = float(partes[-2].replace(",", "."))
     nome = ",".join(partes[:-2]).strip() or "(cidade)"
-    return (nome, lat, lon)
+    return {"nome": nome, "lat": lat, "lon": lon}
 
 
 def ponto_na_regiao(lon, lat, regiao):
@@ -548,191 +595,228 @@ def ponto_na_regiao(lon, lat, regiao):
 FONTES = ["aws", "azure", "ecmwf"]
 
 
-def baixar(param, step, grib_file, data_rodada=None, hora_rodada=0):
-    """Baixa um passo tentando cada fonte em ordem; se uma falhar (429, etc.),
-    passa para a próxima em vez de insistir no mesmo endpoint congestionado."""
+def intervalo_brasilia(data):
+    """Dia civil [00:00, 00:00 seguinte) sempre em America/Sao_Paulo."""
+    inicio = dt.datetime.combine(data, dt.time.min, tzinfo=BRASILIA)
+    fim = dt.datetime.combine(data + dt.timedelta(days=1), dt.time.min, tzinfo=BRASILIA)
+    return inicio, fim
+
+
+def _utc(valor):
+    if valor.tzinfo is None:
+        valor = valor.replace(tzinfo=UTC)
+    return valor.astimezone(UTC)
+
+
+def _horas(rodada, instante):
+    return (_utc(instante) - _utc(rodada)).total_seconds() / 3600.0
+
+
+def vizinhos_step(horas):
+    """Limites nativos; após 144 h, a meia-noite de Brasília exige interpolação."""
+    if not 0 <= horas <= STEPS_ECMWF[-1]:
+        raise ValueError(f"Horário fora da rodada: {horas:g} h")
+    pos = int(np.searchsorted(STEPS_ECMWF, horas))
+    acima = STEPS_ECMWF[pos]
+    if math.isclose(acima, horas, abs_tol=1e-8):
+        return acima, acima, 0.0
+    abaixo = STEPS_ECMWF[pos - 1]
+    return abaixo, acima, (horas - abaixo) / (acima - abaixo)
+
+
+def baixar(param, step, grib_file, data_rodada, hora_rodada):
+    """Cada espelho recebe exatamente a mesma rodada; nunca usa latest implícito."""
     from ecmwf.opendata import Client
-    kw = dict(type="fc", stream="oper", param=param, step=step, target=grib_file)
-    if data_rodada is not None:
-        kw["date"] = data_rodada.strftime("%Y%m%d")
-        kw["time"] = hora_rodada
+    kw = dict(type="fc", stream="oper", param=param, step=step,
+              target=grib_file, date=data_rodada.strftime("%Y%m%d"), time=hora_rodada)
     ultimo = None
     for fonte in FONTES:
         try:
-            Client(source=fonte).retrieve(**kw)
+            Client(source=fonte, model="ifs", resol="0p25",
+                   infer_stream_keyword=False).retrieve(**kw)
             return
         except Exception as e:
             ultimo = e
-            print(f"    (fonte '{fonte}' falhou: {e}; tentando a próxima)")
-    raise ultimo if ultimo else RuntimeError("nenhuma fonte disponível")
+            print(f"    (fonte {fonte}: {e}; tentando próxima)")
+    raise RuntimeError(f"Falha em {param}, passo {step} h: {ultimo}") from ultimo
 
 
-def ler_grib(grib_file, param, fator=1.0, offset=0.0):
-    """Lê o GRIB, ajusta longitude p/ -180..180, recorta o domínio e converte
-    (arr*fator+offset). Retorna (lons, lats, arr) com norte no topo."""
+def ler_grib(grib_file, param, dominio, rodada, step):
+    """Valida rodada/horário, normaliza coordenadas e carrega o domínio completo."""
     import xarray as xr
-    ds = xr.open_dataset(grib_file, engine="cfgrib")
-    da = ds[param] if param in ds else ds[list(ds.data_vars)[0]]
-    if float(da.longitude.max()) > 180:
-        da = da.assign_coords(
-            longitude=(((da.longitude + 180) % 360) - 180)
-        ).sortby("longitude")
-    rec = da.sel(latitude=slice(LAT_MAX, LAT_MIN),
-                 longitude=slice(LON_MIN, LON_MAX))
-    lats = np.asarray(rec.latitude.values, dtype="float64")
-    lons = np.asarray(rec.longitude.values, dtype="float64")
-    arr = np.asarray(rec.values, dtype="float32") * fator + offset
-    if lats[0] < lats[-1]:
-        lats = lats[::-1]
-        arr = arr[::-1, :]
+    aliases = {"tp": ("tp",), "2t": ("t2m", "2t"), "tcc": ("tcc",)}
+    with xr.open_dataset(grib_file, engine="cfgrib",
+                         backend_kwargs={"indexpath": ""}) as ds:
+        nome = next((n for n in aliases[param] if n in ds.data_vars), None)
+        if nome is None:
+            raise ValueError(f"Parâmetro {param} ausente no GRIB: {list(ds.data_vars)}")
+        da = ds[nome].squeeze(drop=False)
+        for coord, esperado in (("time", rodada),
+                                ("valid_time", rodada + dt.timedelta(hours=step))):
+            if coord not in da.coords:
+                raise ValueError(f"GRIB sem {coord}; não é possível validar o período")
+            valor = np.asarray(da.coords[coord].values)
+            if valor.size != 1:
+                raise ValueError(f"Mais de um {coord} no GRIB")
+            recebido = valor.reshape(-1)[0].astype("datetime64[s]").astype(dt.datetime)
+            if _utc(recebido) != _utc(esperado):
+                raise ValueError(f"GRIB incompatível: {coord}={recebido}, esperado={esperado}")
+        da = da.assign_coords(longitude=(((da.longitude + 180) % 360) - 180))
+        da = da.sortby("longitude").sortby("latitude", ascending=False)
+        lo0, lo1, la0, la1 = dominio
+        rec = da.sel(latitude=slice(la1, la0), longitude=slice(lo0, lo1))
+        rec = rec.transpose("latitude", "longitude")
+        lons = np.asarray(rec.longitude.values, dtype="float64")
+        lats = np.asarray(rec.latitude.values, dtype="float64")
+        arr = np.asarray(rec.values, dtype="float32").copy()
+        unidades = str(da.attrs.get("units", "")).lower()
+    if lons.size < 2 or lats.size < 2 or not np.isfinite(arr).all():
+        raise ValueError("Grade vazia ou com dados ausentes no domínio solicitado")
+    if param == "tp":
+        if unidades not in ("mm", "kg m**-2", "kg m-2"):
+            arr *= 1000.0
+    elif param == "2t":
+        if unidades not in ("c", "°c", "degc", "celsius"):
+            arr -= 273.15
+    elif param == "tcc":
+        if unidades not in ("%", "percent", "percentage"):
+            arr *= 100.0
+        arr = np.clip(arr, 0.0, 100.0)
     return lons, lats, arr
 
 
-def _valid_utc(grib_file, param):
-    try:
-        import xarray as xr
-        ds = xr.open_dataset(grib_file, engine="cfgrib")
-        da = ds[param] if param in ds else ds[list(ds.data_vars)[0]]
-        v = da.coords.get("valid_time")
-        if v is None:
-            return None
-        val = v.values.reshape(-1)[0] if getattr(v.values, "ndim", 0) else v.values
-        return np.datetime64(val).astype("datetime64[s]").astype(dt.datetime)
-    except Exception:
-        return None
+def dominio_dos_alvos(alvos):
+    """Uma célula extra em cada lado garante preenchimento até a moldura."""
+    exts = [alvo[2] for alvo in alvos if alvo[2] is not None]
+    if not exts:
+        return (LON_MIN, LON_MAX, LAT_MIN, LAT_MAX)
+    return (math.floor(min(e[0] for e in exts) * 4) / 4 - 0.5,
+            math.ceil(max(e[1] for e in exts) * 4) / 4 + 0.5,
+            math.floor(min(e[2] for e in exts) * 4) / 4 - 0.5,
+            math.ceil(max(e[3] for e in exts) * 4) / 4 + 0.5)
 
 
-def _remover(*caminhos):
-    for base in caminhos:
-        for f in (base, base + ".idx"):
-            if os.path.exists(f):
-                try:
-                    os.remove(f)
-                except OSError:
-                    pass
+class CamposECMWF:
+    """Cache por rodada, resolução, domínio, parâmetro e passo; campos reutilizados."""
+    def __init__(self, rodada, dominio, cache_dir=None):
+        self.rodada = _utc(rodada)
+        self.dominio = tuple(dominio)
+        self.memoria = {}
+        self.lons = self.lats = None
+        assinatura = hashlib.sha256(json.dumps(self.dominio).encode()).hexdigest()[:12]
+        self.pasta = (os.path.join(cache_dir, "brasilia_v1",
+                      self.rodada.strftime("%Y%m%dT%H00Z"), assinatura) if cache_dir else None)
+        if self.pasta:
+            os.makedirs(self.pasta, exist_ok=True)
+
+    def nativo(self, param, step):
+        chave = (param, int(step))
+        if chave in self.memoria:
+            return self.memoria[chave]
+        cp = os.path.join(self.pasta, f"{param}_{step:03d}.npz") if self.pasta else None
+        campo = None
+        if cp and os.path.isfile(cp):
+            try:
+                with np.load(cp, allow_pickle=False) as c:
+                    if (str(c["rodada"]) != self.rodada.isoformat() or
+                            int(c["step"]) != step or str(c["param"]) != param):
+                        raise ValueError("metadados de cache incompatíveis")
+                    campo = (c["lons"].copy(), c["lats"].copy(), c["dados"].copy())
+            except (ValueError, OSError, KeyError):
+                campo = None
+        if campo is None:
+            import tempfile
+            with tempfile.TemporaryDirectory(prefix="ecmwf_") as tmp:
+                grib = os.path.join(tmp, "campo.grib2")
+                baixar(param, step, grib, self.rodada.date(), self.rodada.hour)
+                campo = ler_grib(grib, param, self.dominio, self.rodada, step)
+            if cp:
+                temporario = cp + ".tmp.npz"
+                np.savez_compressed(temporario, lons=campo[0], lats=campo[1], dados=campo[2],
+                                    rodada=self.rodada.isoformat(), step=step, param=param)
+                os.replace(temporario, cp)
+        lo, la, arr = campo
+        if (len(lo) < 2 or len(la) < 2 or arr.shape != (len(la), len(lo)) or
+                not np.isfinite(arr).all()):
+            raise ValueError(f"Campo inválido: {param}/{step} h")
+        if self.lons is not None and (not np.array_equal(lo, self.lons) or
+                                      not np.array_equal(la, self.lats)):
+            raise ValueError("Grades diferentes na mesma rodada")
+        self.lons, self.lats = lo, la
+        self.memoria[chave] = arr
+        return arr
+
+    def em(self, param, instante):
+        h = _horas(self.rodada, instante)
+        a, b, peso = vizinhos_step(h)
+        primeiro = self.nativo(param, a)
+        return primeiro if a == b else primeiro * (1 - peso) + self.nativo(param, b) * peso
 
 
-# ---- cache em disco: evita rebaixar o mesmo dado no mesmo dia ----
-def _dt_iso(v):
-    return v.strftime("%Y-%m-%dT%H:%M:%S") if v is not None else ""
-
-
-def _iso_dt(s):
-    s = str(s)
-    if not s:
-        return None
-    try:
-        return dt.datetime.fromisoformat(s)
-    except ValueError:
-        return None
-
-
-def _cache_path(cache_dir, var, dia, step):
-    return os.path.join(cache_dir, f"{var}_{dia}_s{step}.npz")
-
-
-def _cache_load(cache_dir, var, dia, step):
-    if not cache_dir:
-        return None
-    cp = _cache_path(cache_dir, var, dia, step)
-    if os.path.exists(cp):
-        try:
-            return dict(np.load(cp, allow_pickle=False))
-        except Exception:
-            return None
-    return None
-
-
-def _cache_save(cache_dir, var, dia, step, **arrays):
-    if not cache_dir:
-        return
-    try:
-        os.makedirs(cache_dir, exist_ok=True)
-        np.savez(_cache_path(cache_dir, var, dia, step), **arrays)
-    except Exception as e:
-        print(f"    (aviso: não consegui gravar cache {var} {step}h: {e})")
-
-
-def obter_chuva(step, tmp_prefix, data_rodada=None, hora_rodada=0,
-                cache_dir=None, dia=None):
-    """(lons, lats, acumulado_mm, diario_mm, valido). Acumulado = tp no passo;
-    diário = tp(step) - tp(step-24); no dia 1 o anterior é 0."""
-    c = _cache_load(cache_dir, "chuva", dia, step)
-    if c is not None:
-        print(f"    (cache: chuva {step}h)")
-        return c["lons"], c["lats"], c["acum"], c["diario"], _iso_dt(c["valido"])
-    g = f"{tmp_prefix}_tp_{step}h.grib2"
-    baixar("tp", step, g, data_rodada, hora_rodada)
-    lons, lats, acum = ler_grib(g, "tp", 1000.0, 0.0)  # m -> mm
-    valido = _valid_utc(g, "tp")
-    if step > 24:
-        g2 = f"{tmp_prefix}_tp_{step-24}h.grib2"
-        baixar("tp", step - 24, g2, data_rodada, hora_rodada)
-        _, _, acum_ant = ler_grib(g2, "tp", 1000.0, 0.0)
-        diario = np.clip(acum - acum_ant, 0, None)
-        _remover(g2)
-    else:
-        diario = np.clip(acum, 0, None)
-    _remover(g)
-    _cache_save(cache_dir, "chuva", dia, step, lons=lons, lats=lats,
-                acum=acum, diario=diario, valido=_dt_iso(valido))
-    return lons, lats, acum, diario, valido
-
-
-def obter_nuvem(step, tmp_prefix, data_rodada=None, hora_rodada=0,
-                cache_dir=None, dia=None):
-    """(lons, lats, nuvem_%, valido). tcc é fração instantânea 0..1."""
-    c = _cache_load(cache_dir, "nuvem", dia, step)
-    if c is not None:
-        print(f"    (cache: nuvem {step}h)")
-        return c["lons"], c["lats"], c["nuvem"], _iso_dt(c["valido"])
-    g = f"{tmp_prefix}_tcc_{step}h.grib2"
-    baixar("tcc", step, g, data_rodada, hora_rodada)
-    lons, lats, arr = ler_grib(g, "tcc", 100.0, 0.0)
-    valido = _valid_utc(g, "tcc")
-    _remover(g)
-    arr = np.clip(arr, 0, 100)
-    _cache_save(cache_dir, "nuvem", dia, step, lons=lons, lats=lats,
-                nuvem=arr, valido=_dt_iso(valido))
-    return lons, lats, arr, valido
-
-
-def obter_temp(step, tmp_prefix, data_rodada=None, hora_rodada=0,
-               cache_dir=None, dia=None):
-    """(lons, lats, tmin_C, tmax_C, valido). Mín e máx do dia a partir dos
-    sub-passos de 2t (3 em 3 h até 144 h, 6 em 6 h depois). Baixa cada
-    sub-passo UMA vez e atualiza mín e máx juntos."""
-    c = _cache_load(cache_dir, "temp", dia, step)
-    if c is not None:
-        print(f"    (cache: temperatura {step}h)")
-        return c["lons"], c["lats"], c["tmin"], c["tmax"], _iso_dt(c["valido"])
-    passo = 3 if step <= 144 else 6
-    ini = step - 24 + passo
-    sub_steps = list(range(ini, step + 1, passo))
-    if step not in sub_steps:
-        sub_steps.append(step)
-    lons = lats = tmin = tmax = valido = None
-    for s in sub_steps:
-        if s <= 0:
+def escolher_rodada(hoje, dias, vars_sel, dominio, cache_dir=None, rodada_fixa=None):
+    """Mais recente 00/12 UTC iniciada antes de 00 h BRT de hoje e disponível."""
+    inicio, _ = intervalo_brasilia(hoje)
+    _, fim = intervalo_brasilia(hoje + dt.timedelta(days=max(dias)))
+    primeira = dt.datetime.combine(hoje, dt.time.min, tzinfo=UTC)
+    candidatas = ([_utc(rodada_fixa)] if rodada_fixa else
+                  [primeira - dt.timedelta(hours=12 * i) for i in range(4)])
+    parametro = "tp" if "chuva" in vars_sel else ("2t" if set(vars_sel) & {"tmin", "tmax"} else "tcc")
+    erros = []
+    for rodada in candidatas:
+        if rodada > _utc(inicio) or rodada.hour not in (0, 12) or rodada.minute or rodada.second:
+            erros.append(f"{rodada.isoformat()}: não cobre o início do dia ou não é rodada 00/12 UTC")
             continue
-        g = f"{tmp_prefix}_2t_{s}h.grib2"
+        print(f"Conferindo rodada {rodada.isoformat()}...")
         try:
-            baixar("2t", s, g, data_rodada, hora_rodada)
-            lo, la, arr = ler_grib(g, "2t", 1.0, -273.15)  # K -> °C
-            lons, lats = lo, la
-            if s == step:
-                valido = _valid_utc(g, "2t")
-            tmin = arr if tmin is None else np.fmin(tmin, arr)
-            tmax = arr if tmax is None else np.fmax(tmax, arr)
+            campos = CamposECMWF(rodada, dominio, cache_dir)
+            _, ultimo_step, _ = vizinhos_step(_horas(rodada, fim))
+            campos.nativo(parametro, ultimo_step)
+            return campos
         except Exception as e:
-            print(f"    (sub-passo 2t {s}h indisponível: {e})")
-        finally:
-            _remover(g)
-    if tmin is None:
-        raise RuntimeError("nenhum sub-passo de 2t disponível")
-    _cache_save(cache_dir, "temp", dia, step, lons=lons, lats=lats,
-                tmin=tmin, tmax=tmax, valido=_dt_iso(valido))
-    return lons, lats, tmin, tmax, valido
+            erros.append(f"{rodada.isoformat()}: {e}")
+            print(f"  Rodada indisponível: {e}")
+    raise RuntimeError("Nenhuma rodada disponível cobre os dias completos de Brasília. " + " | ".join(erros))
+
+
+def _nos_periodo(rodada, inicio, fim):
+    a, b = _horas(rodada, inicio), _horas(rodada, fim)
+    return [a] + [s for s in STEPS_ECMWF if a < s < b] + [b]
+
+
+def calcular_dia(campos, data, hoje, vars_sel):
+    """Produtos do dia local completo; precipitação acumulada começa em hoje 00 h BRT."""
+    inicio, fim = intervalo_brasilia(data)
+    inicio_acum, _ = intervalo_brasilia(hoje)
+    nos = _nos_periodo(campos.rodada, inicio, fim)
+    chuva_interp = any(vizinhos_step(_horas(campos.rodada, t))[0] !=
+                      vizinhos_step(_horas(campos.rodada, t))[1] for t in (inicio, fim))
+    resultados = {}
+    if "chuva" in vars_sel:
+        fim_tp = campos.em("tp", fim)
+        resultados["chuva_dia"] = np.maximum(fim_tp - campos.em("tp", inicio), 0)
+        resultados["chuva_acumulado"] = np.maximum(fim_tp - campos.em("tp", inicio_acum), 0)
+    if set(vars_sel) & {"tmin", "tmax"}:
+        # Somente instantes dentro do dia: 00 h do dia seguinte é excluída.
+        valores = [campos.em("2t", campos.rodada + dt.timedelta(hours=h)) for h in nos[:-1]]
+        if "tmin" in vars_sel:
+            resultados["tmin"] = np.minimum.reduce(valores)
+        if "tmax" in vars_sel:
+            resultados["tmax"] = np.maximum.reduce(valores)
+    if "nuvem" in vars_sel:
+        valores = [campos.em("tcc", campos.rodada + dt.timedelta(hours=h)) for h in nos]
+        integral = sum((valores[i] + valores[i+1]) * (nos[i+1] - nos[i]) / 2
+                       for i in range(len(nos) - 1))
+        resultados["nuvem"] = np.clip(integral / (nos[-1] - nos[0]), 0, 100)
+    metadados = {
+        "data": data.isoformat(), "dia_semana": DIAS_SEMANA[data.weekday()],
+        "inicio_brasilia": inicio.isoformat(), "fim_brasilia_exclusivo": fim.isoformat(),
+        "inicio_utc": _utc(inicio).isoformat(), "fim_utc_exclusivo": _utc(fim).isoformat(),
+        "inicio_acumulado_brasilia": inicio_acum.isoformat(),
+        "chuva_limites_interpolados": chuva_interp,
+        "temperatura": "mínima/máxima estimadas entre amostras dentro do dia",
+        "nuvem": "média diária ponderada pelo tempo, integração trapezoidal",
+    }
+    return resultados, metadados
 
 
 # =========================================================================
@@ -782,16 +866,31 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
            cor_acima=None, cor_abaixo=None, extend="max",
            extent=None, regiao=None, fundo=None, recortar=False, cidades=None,
            logo=None, logo_pos="inferior-direita", logo_escala=0.16, logo_alpha=1.0,
-           logo_fundo=True):
+           logo_fundo=True, rodape=""):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
 
+    # Desenha somente a grade necessária, incluindo as células que cobrem
+    # a moldura. Não amplia o enquadramento para além dos dados disponíveis.
+    if extent is not None:
+        if (extent[0] < min(lons) or extent[1] > max(lons) or
+                extent[2] < min(lats) or extent[3] > max(lats)):
+            raise ValueError("O domínio dos dados não cobre a moldura do mapa")
+        ix0 = max(0, int(np.searchsorted(lons, extent[0])) - 1)
+        ix1 = min(len(lons), int(np.searchsorted(lons, extent[1], side="right")) + 1)
+        dentro = np.flatnonzero((lats >= extent[2]) & (lats <= extent[3]))
+        if dentro.size:
+            iy0, iy1 = max(0, dentro[0] - 1), min(len(lats), dentro[-1] + 2)
+        else:
+            meio = int(np.argmin(np.abs(lats - (extent[2] + extent[3]) / 2)))
+            iy0, iy1 = max(0, meio - 1), min(len(lats), meio + 2)
+        lons, lats, dados = lons[ix0:ix1], lats[iy0:iy1], dados[iy0:iy1, ix0:ix1]
     levels, cmap, norm, ticks = construir_colormap(faixas, cor_acima, cor_abaixo)
     lon2d, lat2d = np.meshgrid(lons, lats)
 
-    fig, ax = plt.subplots(figsize=(9, 9), dpi=130)
+    fig, ax = plt.subplots(figsize=(10, 9), dpi=130)
     cs = ax.contourf(lon2d, lat2d, dados, levels=levels, cmap=cmap, norm=norm,
                      extend=extend, antialiased=True)
 
@@ -822,10 +921,13 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     if cidades:
         import matplotlib.patheffects as pe
         halo = [pe.withStroke(linewidth=2.4, foreground="white")]
-        for (nome, lat, lon) in cidades:
+        for cidade in cidades:
+            nome, lat, lon = cidade["nome"], cidade["lat"], cidade["lon"]
             ax.plot(lon, lat, marker="o", markersize=5.5, markerfacecolor="black",
                     markeredgecolor="white", markeredgewidth=0.9, zorder=6)
-            t = ax.annotate(nome, (lon, lat), xytext=(5, 4),
+            perto_direita = extent is not None and lon > extent[0] + 0.7 * (extent[1] - extent[0])
+            t = ax.annotate(nome, (lon, lat), xytext=(-5 if perto_direita else 5, 4),
+                            ha="right" if perto_direita else "left",
                             textcoords="offset points", fontsize=11.5,
                             fontweight="bold", color="black", zorder=7)
             t.set_path_effects(halo)
@@ -843,16 +945,26 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     for sp in ax.spines.values():
         sp.set_visible(True); sp.set_linewidth(1.0)
 
-    ax.set_title(titulo, loc="left", fontsize=16, fontweight="bold", pad=8)
-    ax.set_title(periodo_txt, loc="right", fontsize=16, fontweight="bold",
-                 color="blue", pad=8)
+    nome_alvo = regiao["nome"] if regiao is not None else "Brasil"
+    # Duas linhas centralizadas evitam sobreposição em regiões estreitas.
+    ax.set_title(f"{nome_alvo} | {titulo}\n{periodo_txt}",
+                 fontsize=13, fontweight="bold", pad=10)
 
-    cb = fig.colorbar(cs, ax=ax, fraction=0.046, pad=0.02, ticks=ticks, extend=extend)
+    # A legenda acompanha a altura real do mapa, inclusive em enquadramentos
+    # largos/baixos; evita faixas brancas externas impostas pela colorbar.
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    cax = make_axes_locatable(ax).append_axes("right", size="4.5%", pad=0.12)
+    cb = fig.colorbar(cs, cax=cax, ticks=ticks, extend=extend)
     cb.ax.tick_params(labelsize=15)
     cb.set_ticklabels(["%g" % t for t in ticks])
 
     if logo:
+        fig.canvas.draw()
         _add_logo(fig, ax, logo, logo_pos, logo_escala, logo_alpha, fundo=logo_fundo)
+
+    if rodape:
+        ax.text(0.0, -0.025, rodape, transform=ax.transAxes,
+                fontsize=8, va="top", ha="left", linespacing=1.5)
 
     fig.savefig(png_path, bbox_inches="tight", facecolor="white")
     plt.close(fig)
@@ -866,23 +978,13 @@ def _fmt_dia(d):
 
 
 def periodo_acumulado(base, dias):
-    ini = base
     fim = base + dt.timedelta(days=dias)
-    yy = str(fim.year)[2:]
-    if ini.year == fim.year and ini.month == fim.month:
-        return f"{ini.day} a {fim.day}/{MESES_PT[fim.month - 1]}/{yy}"
-    if ini.year == fim.year:
-        return (f"{ini.day}/{MESES_PT[ini.month - 1]} a "
-                f"{fim.day}/{MESES_PT[fim.month - 1]}/{yy}")
-    return f"{_fmt_dia(ini)} a {_fmt_dia(fim)}"
+    return f"{_fmt_dia(base)} a {_fmt_dia(fim)}"
 
 
 def periodo_diario(base, dias):
-    return _fmt_dia(base + dt.timedelta(days=dias))
-
-
-def _base_do_valido(valido, dias, rodada_hoje):
-    return (valido - dt.timedelta(days=dias)).date() if valido is not None else rodada_hoje
+    data = base + dt.timedelta(days=dias)
+    return f"{DIAS_SEMANA[data.weekday()]} — {_fmt_dia(data)}"
 
 
 # =========================================================================
@@ -921,8 +1023,12 @@ def main():
                          "(padrão: aws azure ecmwf — espelhos primeiro, evita 429)")
     ap.add_argument("--vars", nargs="+", default=VARS_VALIDAS, choices=VARS_VALIDAS,
                     help="variáveis a gerar (padrão: todas)")
-    ap.add_argument("--dias", nargs="+", type=int, default=[1, 2, 3, 4, 5, 6, 7],
-                    help="horizontes em dias (1..7)")
+    ap.add_argument("--dias", nargs="+", type=int, default=list(range(8)),
+                    help="dias a partir de hoje em Brasília: 0=hoje, 1=amanhã, até 7")
+    ap.add_argument("--data-base", type=dt.date.fromisoformat, default=None,
+                    help="data local de referência AAAA-MM-DD; padrão: hoje em Brasília")
+    ap.add_argument("--rodada", default=None,
+                    help="rodada UTC opcional, ex.: 2026-09-23T00:00:00Z; padrão: automática")
     ap.add_argument("--saida", default="saida_previsao", help="pasta de saída")
     ap.add_argument("--margem", type=float, default=1.0,
                     help="folga em graus ao redor da região no recorte da imagem")
@@ -931,12 +1037,12 @@ def main():
     ap.add_argument("--todas-meso", action="store_true",
                     help="gera TODAS as mesorregiões identificadas, "
                          "em pastas <saida>/<UF>/<mesorregião>/")
-    ap.add_argument("--todos-estados", action="store_true",
-                    help="gera também cada estado como figura própria, em <saida>/<UF>/")
+    ap.add_argument("--todos-estados", action="store_true", default=True,
+                    help="compatibilidade: os estados são sempre gerados em <saida>/<UF>/")
     ap.add_argument("--somente-estrutura", action="store_true",
                     help="valida os KMLs e cria as pastas com sua identificação, "
                          "sem baixar previsão nem gerar mapas")
-    ap.add_argument("--cidades", default=None,
+    ap.add_argument("--cidades", default=CIDADES_PADRAO,
                     help="arquivo de cidades (CSV nome,lat,lon ou KML de pontos); "
                          "mostra as que caem dentro da região focada")
     ap.add_argument("--cidade", action="append", default=[],
@@ -955,6 +1061,18 @@ def main():
     args = ap.parse_args()
 
     vars_sel = list(dict.fromkeys(args.vars))  # únicas, mantendo ordem
+    dias_sel = sorted(set(args.dias))
+    if any(d < 0 or d > 7 for d in dias_sel):
+        ap.error("--dias aceita 0 (hoje) a 7, sempre pelo horário de Brasília")
+    if not math.isfinite(args.margem) or args.margem < 0:
+        ap.error("--margem deve ser um número maior ou igual a zero")
+    hoje = args.data_base or dt.datetime.now(BRASILIA).date()
+    rodada_fixa = None
+    if args.rodada:
+        try:
+            rodada_fixa = _utc(dt.datetime.fromisoformat(args.rodada.replace("Z", "+00:00")))
+        except ValueError:
+            ap.error("--rodada inválida; use AAAA-MM-DDTHH:00:00Z")
 
     global FONTES
     if args.fonte:
@@ -989,11 +1107,19 @@ def main():
     # cidades de referência
     cidades_arquivo = []
     if args.cidades:
-        if os.path.exists(args.cidades):
-            cidades_arquivo = ler_cidades(args.cidades)
-            print(f"Cidades: {len(cidades_arquivo)} ponto(s) de {args.cidades}")
-        else:
-            print(f"  AVISO: arquivo de cidades não encontrado: {args.cidades}")
+        caminho_cidades = args.cidades
+        if not os.path.isfile(caminho_cidades) and not os.path.isabs(caminho_cidades):
+            caminho_cidades = os.path.join(os.path.dirname(__file__), caminho_cidades)
+        if os.path.isfile(caminho_cidades):
+            try:
+                cidades_arquivo = ler_cidades(caminho_cidades)
+            except (ValueError, OSError) as e:
+                sys.exit(f"ERRO nas cidades: {e}")
+            print(f"Cidades: {len(cidades_arquivo)} ponto(s) de {caminho_cidades}")
+        elif args.todas_meso or any(r["tipo"] == "mesorregiao" for r in
+                                  (selecionar_regiao(regioes, p) for p in pedidos) if r):
+            sys.exit(f"ERRO: arquivo de cidades não encontrado: {args.cidades}. "
+                     "Coloque o CSV de cidades no repositório ou ajuste --cidades.")
     cidades_cli = []
     for txt in args.cidade:
         try:
@@ -1017,7 +1143,10 @@ def main():
         m = args.margem
         ext = (lo0 - m, lo1 + m, la0 - m, la1 + m)
         cids = list(cidades_cli)
-        cids += [c for c in cidades_arquivo if ponto_na_regiao(c[2], c[1], r)]
+        try:
+            cids += cidades_da_mesorregiao(r, cidades_arquivo, fundo_regioes)
+        except ValueError as e:
+            sys.exit(f"ERRO nas cidades: {e}")
         sub = subdir_do_alvo(r, fundo_regioes)
         return (sub, r, ext, cids)
 
@@ -1028,7 +1157,7 @@ def main():
         ext_br = None
         if bb:
             lo0, la0, lo1, la1 = bb
-            mb = max(args.margem, 1.5)
+            mb = min(max(args.margem, 0.15), 0.5)
             ext_br = (lo0 - mb, lo1 + mb, la0 - mb, la1 + mb)
         alvos.append(("brasil", None, ext_br, list(cidades_cli)))
         print("Alvo: Brasil inteiro (sempre)")
@@ -1075,100 +1204,56 @@ def main():
         print("Somente estrutura: nenhum download ou mapa foi gerado.")
         return
     cache_dir = None if args.sem_cache else args.cache
-    if cache_dir:
-        os.makedirs(cache_dir, exist_ok=True)
-    dia_cache = dt.datetime.utcnow().date().isoformat()   # dado "do dia" (UTC)
-    tmp = os.path.join(cache_dir or args.saida, "_tmp")
-    rodada_hoje = dt.date.today()
+    dominio = dominio_dos_alvos(alvos)
+    print(f"Períodos: hoje={hoje.isoformat()}, dias={dias_sel}, fuso=America/Sao_Paulo")
+    print("=== Fase 1: download e cálculo dos dias completos em Brasília ===")
+    try:
+        campos = escolher_rodada(hoje, dias_sel, vars_sel, dominio, cache_dir, rodada_fixa)
+    except Exception as e:
+        sys.exit(f"ERRO ao selecionar rodada: {e}")
+    rodada_brt = campos.rodada.astimezone(BRASILIA)
+    print(f"Rodada selecionada: {rodada_brt.isoformat()} (Brasília)")
+    dias_dados = {}
+    periodos = []
+    definicoes = {
+        "chuva_acumulado": ("Acumulado (mm)", FAIXAS_CHUVA, CHUVA_ACIMA, None, "max"),
+        "chuva_dia": ("Chuva do dia (mm)", FAIXAS_CHUVA, CHUVA_ACIMA, None, "max"),
+        "tmin": ("Temp. mínima (°C)", FAIXAS_TEMP, TEMP_ACIMA, TEMP_ABAIXO, "both"),
+        "tmax": ("Temp. máxima (°C)", FAIXAS_TEMP, TEMP_ACIMA, TEMP_ABAIXO, "both"),
+        "nuvem": ("Nuvens — média diária (%)", FAIXAS_NUVEM, None, None, "neither"),
+    }
+    for dias in dias_sel:
+        data = hoje + dt.timedelta(days=dias)
+        print(f"[{dias}d] {periodo_diario(hoje, dias)}")
+        try:
+            valores, metadados = calcular_dia(campos, data, hoje, vars_sel)
+        except Exception as e:
+            # Falhar impede publicar somente parte dos dias solicitados.
+            sys.exit(f"ERRO no dia {data}: {e}. Publicação interrompida.")
+        produtos = []
+        for tipo in definicoes:
+            if tipo not in valores:
+                continue
+            titulo, faixas, c_a, c_b, ext_cb = definicoes[tipo]
+            periodo = (periodo_acumulado(hoje, dias) if tipo == "chuva_acumulado"
+                       else periodo_diario(hoje, dias))
+            # O usuário pediu apenas o dia no mapa. Métodos e horários ficam
+            # nos metadados de previsao.json, sem notas no rodapé das imagens.
+            produtos.append((tipo, valores[tipo], titulo, periodo, faixas, c_a, c_b, ext_cb, ""))
+        dias_dados[dias] = {"lons": campos.lons, "lats": campos.lats, "produtos": produtos}
+        periodos.append(dict(metadados, horizonte_dias=dias, produtos=list(valores)))
 
-    if cache_dir:
-        print(f"Cache: {cache_dir} (dia {dia_cache}) — não rebaixa o que já tem")
-
-    # =====================================================================
-    # FASE 1 — DOWNLOAD: baixa tudo primeiro (1x por variável/dia). Toda a
-    # rede acontece aqui; os campos ficam em memória para a fase de corte.
-    # =====================================================================
-    print(f"Variáveis: {', '.join(vars_sel)} | dias: {sorted(set(args.dias))} | "
-          f"alvos: {len(alvos)}")
-    print("=== Fase 1: download do ECMWF ===")
-    dias_dados = {}  # dias -> {"lons","lats","produtos":[...]}
-    for dias in sorted(set(args.dias)):
-        if dias < 1 or dias > 7:
-            print(f"  (pulando dia {dias}: fora de 1..7)")
-            continue
-        step = dias * 24
-        lons = lats = None
-        produtos = []  # (tipo, campo, titulo, periodo, faixas, c_acima, c_abaixo, extend)
-
-        if "chuva" in vars_sel:
-            print(f"[{dias}d] chuva (tp)...")
-            try:
-                lo, la, acum, diario, valido = obter_chuva(step, tmp, cache_dir=cache_dir, dia=dia_cache)
-                lons, lats = lo, la
-                base = _base_do_valido(valido, dias, rodada_hoje)
-                produtos.append(("chuva_acumulado", acum, "Acumulado (mm)",
-                                 periodo_acumulado(base, dias),
-                                 FAIXAS_CHUVA, CHUVA_ACIMA, None, "max"))
-                produtos.append(("chuva_dia", diario, "Total (mm)",
-                                 periodo_diario(base, dias),
-                                 FAIXAS_CHUVA, CHUVA_ACIMA, None, "max"))
-            except Exception as e:
-                print(f"  ERRO chuva {dias}d: {e}")
-
-        if "tmin" in vars_sel or "tmax" in vars_sel:
-            print(f"[{dias}d] temperatura (2t, sub-passos)...")
-            try:
-                lo, la, tmin, tmax, valido = obter_temp(step, tmp, cache_dir=cache_dir, dia=dia_cache)
-                lons, lats = lo, la
-                base = _base_do_valido(valido, dias, rodada_hoje)
-                if "tmin" in vars_sel:
-                    produtos.append(("tmin", tmin, "Temp. mínima (°C)",
-                                     periodo_diario(base, dias),
-                                     FAIXAS_TEMP, TEMP_ACIMA, TEMP_ABAIXO, "both"))
-                if "tmax" in vars_sel:
-                    produtos.append(("tmax", tmax, "Temp. máxima (°C)",
-                                     periodo_diario(base, dias),
-                                     FAIXAS_TEMP, TEMP_ACIMA, TEMP_ABAIXO, "both"))
-            except Exception as e:
-                print(f"  ERRO temperatura {dias}d: {e}")
-
-        if "nuvem" in vars_sel:
-            print(f"[{dias}d] nuvem (tcc)...")
-            try:
-                lo, la, nuvem, valido = obter_nuvem(step, tmp, cache_dir=cache_dir, dia=dia_cache)
-                lons, lats = lo, la
-                base = _base_do_valido(valido, dias, rodada_hoje)
-                produtos.append(("nuvem", nuvem, "Nuvens (%)",
-                                 periodo_diario(base, dias),
-                                 FAIXAS_NUVEM, None, None, "neither"))
-            except Exception as e:
-                print(f"  ERRO nuvem {dias}d: {e}")
-
-        if produtos and lons is not None:
-            dias_dados[dias] = {"lons": lons, "lats": lats, "produtos": produtos}
-        else:
-            print(f"  (dia {dias}: sem dados — não entra na fase de corte)")
-
-    if not dias_dados:
-        sys.exit("Nada foi baixado — nenhuma figura a gerar (ver erros acima).")
-
-    # =====================================================================
-    # FASE 2 — CORTE: gera as figuras a partir dos dados já baixados.
-    # Nenhum acesso à rede aqui.
-    # =====================================================================
     print("=== Fase 2: recortes e figuras (sem rede) ===")
-    total_esperado = sum(len(alvos) * len(dias_dados[d]["produtos"]) for d in dias_dados)
-    print(f"A gerar ~{total_esperado} figura(s) ({len(alvos)} alvo(s) x "
-          f"{len(dias_dados)} dia(s)).")
+    total_esperado = sum(len(alvos) * len(d["produtos"]) for d in dias_dados.values())
+    print(f"A gerar {total_esperado} figura(s): {len(alvos)} alvos, {len(dias_dados)} dias.")
     inicio = time.time()
     total = 0
     for dias in sorted(dias_dados):
         d = dias_dados[dias]
         lons, lats, produtos = d["lons"], d["lats"], d["produtos"]
-        for (subdir, regiao, extent, cids) in alvos:
+        for subdir, regiao, extent, cids in alvos:
             outdir = os.path.join(args.saida, subdir)
-            os.makedirs(outdir, exist_ok=True)
-            for (tipo, campo, titulo, per, faixas, c_a, c_b, ext_cb) in produtos:
+            for tipo, campo, titulo, per, faixas, c_a, c_b, ext_cb, rodape in produtos:
                 png = os.path.join(outdir, f"ecmwf_{tipo}_{dias}d.png")
                 plotar(lons, lats, campo, titulo, per, png, faixas,
                        cor_acima=c_a, cor_abaixo=c_b, extend=ext_cb,
@@ -1176,23 +1261,24 @@ def main():
                        recortar=args.recortar, cidades=cids,
                        logo=logo, logo_pos=args.logo_pos,
                        logo_escala=args.logo_escala, logo_alpha=args.logo_alpha,
-                       logo_fundo=not args.logo_sem_fundo)
+                       logo_fundo=not args.logo_sem_fundo, rodape=rodape)
                 total += 1
                 if total % 50 == 0 or total == total_esperado:
                     seg = time.time() - inicio
-                    taxa = total / seg if seg > 0 else 0
-                    restam = (total_esperado - total) / taxa if taxa > 0 else 0
-                    print(f"    {total}/{total_esperado} figuras "
-                          f"| {seg:.0f}s decorridos | ~{restam:.0f}s restantes "
-                          f"| {taxa:.1f} fig/s")
+                    taxa = total / seg if seg else 0
+                    restam = (total_esperado - total) / taxa if taxa else 0
+                    print(f"    {total}/{total_esperado} figuras | {seg:.0f}s | ~{restam:.0f}s restantes")
         print(f"  dia {dias}d concluído")
+    resumo = {"fuso": "America/Sao_Paulo", "data_base_brasilia": hoje.isoformat(),
+              "rodada_utc": campos.rodada.isoformat(), "rodada_brasilia": rodada_brt.isoformat(),
+              "gerado_em_brasilia": dt.datetime.now(BRASILIA).isoformat(),
+              "total_mapas": total, "periodos": periodos,
+              "nota": "São previsões do modelo, inclusive para as horas de hoje já transcorridas."}
+    with open(os.path.join(args.saida, "previsao.json"), "w", encoding="utf-8") as fp:
+        json.dump(resumo, fp, ensure_ascii=False, indent=2)
+        fp.write("\n")
     print(f"Fase 2 concluída: {total} figura(s) em {time.time() - inicio:.0f}s.")
-
-    for pasta in {args.saida, cache_dir or args.saida}:
-        for fn in os.listdir(pasta):
-            if fn.startswith("_tmp"):
-                _remover(os.path.join(pasta, fn))
-    print("Pronto.")
+    print("Pronto. Todos os dias calculados no horário de Brasília.")
 
 
 if __name__ == "__main__":

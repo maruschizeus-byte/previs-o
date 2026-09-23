@@ -1,0 +1,138 @@
+﻿UF,Mesorregião,Cidade,Latitude,Longitude,População 2022,Cód. município,Cód. mesorregião,Região
+RO,Madeira-Guaporé,Porto Velho,-8.768892,-63.831446,460434,1100205,1101,Norte
+RO,Leste Rondoniense,Ji-Paraná,-10.882051,-61.945095,124333,1100122,1102,Norte
+AC,Vale do Juruá,Cruzeiro do Sul,-7.630690,-72.672531,91888,1200203,1201,Norte
+AC,Vale do Acre,Rio Branco,-9.978299,-67.810529,364756,1200401,1202,Norte
+AM,Norte Amazonense,São Gabriel da Cachoeira,-0.136463,-67.083643,51795,1303809,1301,Norte
+AM,Sudoeste Amazonense,Tabatinga,-4.231884,-69.946244,66764,1304062,1302,Norte
+AM,Centro Amazonense,Manaus,-3.134691,-60.023335,2063689,1302603,1303,Norte
+AM,Sul Amazonense,Humaitá,-7.512225,-63.026698,57473,1301704,1304,Norte
+RR,Norte de Roraima,Boa Vista,2.816682,-60.670533,413486,1400100,1401,Norte
+RR,Sul de Roraima,Rorainópolis,0.937195,-60.425060,32647,1400472,1402,Norte
+PA,Baixo Amazonas,Santarém,-2.436213,-54.718570,331942,1506807,1501,Norte
+PA,Marajó,Breves,-1.690737,-50.480895,106968,1501808,1502,Norte
+PA,Metropolitana de Belém,Belém,-1.459845,-48.487826,1303403,1501402,1503,Norte
+PA,Nordeste Paraense,Abaetetuba,-1.723470,-48.884404,158188,1500107,1504,Norte
+PA,Sudoeste Paraense,Altamira,-3.205660,-52.214376,126279,1500602,1505,Norte
+PA,Sudeste Paraense,Parauapebas,-6.072730,-49.900781,267836,1505536,1506,Norte
+AP,Norte do Amapá,Oiapoque,3.851131,-51.830553,27482,1600501,1601,Norte
+AP,Sul do Amapá,Macapá,0.038951,-51.057405,442933,1600303,1602,Norte
+TO,Ocidental do Tocantins,Araguaína,-7.191329,-48.208705,171301,1702109,1701,Norte
+TO,Oriental do Tocantins,Palmas,-10.163253,-48.351044,302692,1721000,1702,Norte
+MA,Norte Maranhense,São Luís,-2.531886,-44.297919,1037775,2111300,2101,Nordeste
+MA,Oeste Maranhense,Imperatriz,-5.526524,-47.479811,273110,2105302,2102,Nordeste
+MA,Centro Maranhense,Bacabal,-4.231525,-44.781556,103711,2101202,2103,Nordeste
+MA,Leste Maranhense,Timon,-5.100681,-42.833728,174465,2112209,2104,Nordeste
+MA,Sul Maranhense,Balsas,-7.531170,-46.038993,101767,2101400,2105,Nordeste
+PI,Norte Piauiense,Parnaíba,-2.903360,-41.778171,162159,2207702,2201,Nordeste
+PI,Centro-Norte Piauiense,Teresina,-5.086342,-42.805270,866300,2211001,2202,Nordeste
+PI,Sudoeste Piauiense,Floriano,-6.769672,-43.020645,62036,2203909,2203,Nordeste
+PI,Sudeste Piauiense,Picos,-7.081374,-41.468827,83090,2208007,2204,Nordeste
+CE,Noroeste Cearense,Sobral,-3.688038,-40.348668,203023,2312908,2301,Nordeste
+CE,Norte Cearense,Itapipoca,-3.499436,-39.583482,131123,2306405,2302,Nordeste
+CE,Metropolitana de Fortaleza,Fortaleza,-3.723805,-38.589928,2428708,2304400,2303,Nordeste
+CE,Sertões Cearenses,Quixadá,-4.963700,-39.011745,84168,2311306,2304,Nordeste
+CE,Jaguaribe,Aracati,-4.567066,-37.772753,75113,2301109,2305,Nordeste
+CE,Centro-Sul Cearense,Iguatu,-6.360555,-39.299906,98064,2305506,2306,Nordeste
+CE,Sul Cearense,Juazeiro do Norte,-7.210766,-39.316993,286120,2307304,2307,Nordeste
+RN,Oeste Potiguar,Mossoró,-5.193801,-37.356874,264577,2408003,2401,Nordeste
+RN,Central Potiguar,Caicó,-6.459139,-37.096489,61146,2402006,2402,Nordeste
+RN,Agreste Potiguar,Santa Cruz,-6.230076,-36.020517,37313,2411205,2403,Nordeste
+RN,Leste Potiguar,Natal,-5.750899,-35.252255,751300,2408102,2404,Nordeste
+PB,Sertão Paraibano,Patos,-7.024492,-37.276913,103165,2510808,2501,Nordeste
+PB,Borborema,Monteiro,-7.892217,-37.122681,32277,2509701,2502,Nordeste
+PB,Agreste Paraibano,Campina Grande,-7.221497,-35.883859,419379,2504009,2503,Nordeste
+PB,Mata Paraibana,João Pessoa,-7.149382,-34.873385,833932,2507507,2504,Nordeste
+PE,Sertão Pernambucano,Serra Talhada,-7.987998,-38.296315,92228,2613909,2601,Nordeste
+PE,São Francisco Pernambucano,Petrolina,-9.397376,-40.499999,386791,2611101,2602,Nordeste
+PE,Agreste Pernambucano,Caruaru,-8.285898,-35.967073,378048,2604106,2603,Nordeste
+PE,Mata Pernambucana,Vitória de Santo Antão,-8.118748,-35.293864,134084,2616407,2604,Nordeste
+PE,Metropolitana de Recife,Recife,-8.062762,-34.888942,1488920,2611606,2605,Nordeste
+AL,Sertão Alagoano,Delmiro Gouveia,-9.384574,-37.999233,51318,2702405,2701,Nordeste
+AL,Agreste Alagoano,Arapiraca,-9.755907,-36.657297,234696,2700300,2702,Nordeste
+AL,Leste Alagoano,Maceió,-9.660822,-35.701630,957916,2704302,2703,Nordeste
+SE,Sertão Sergipano,Nossa Senhora da Glória,-10.215687,-37.419921,41212,2804508,2801,Nordeste
+SE,Agreste Sergipano,Itabaiana,-10.685716,-37.426861,103440,2802908,2802,Nordeste
+SE,Leste Sergipano,Aracaju,-10.907216,-37.048213,602757,2800308,2803,Nordeste
+BA,Extremo Oeste Baiano,Barreiras,-12.144925,-45.004168,159734,2903201,2901,Nordeste
+BA,Vale São-Franciscano da Bahia,Juazeiro,-9.410717,-40.503552,237821,2918407,2902,Nordeste
+BA,Centro Norte Baiano,Feira de Santana,-12.229284,-38.960033,616272,2910800,2903,Nordeste
+BA,Nordeste Baiano,Alagoinhas,-12.134183,-38.422616,151055,2900702,2904,Nordeste
+BA,Metropolitana de Salvador,Salvador,-13.014772,-38.488061,2417678,2927408,2905,Nordeste
+BA,Centro Sul Baiano,Vitória da Conquista,-14.848005,-40.839810,370879,2933307,2906,Nordeste
+BA,Sul Baiano,Itabuna,-14.789040,-39.273109,186708,2914802,2907,Nordeste
+MG,Noroeste de Minas,Paracatu,-17.219742,-46.875419,94023,3147006,3101,Sudeste
+MG,Norte de Minas,Montes Claros,-16.722707,-43.865422,414240,3143302,3102,Sudeste
+MG,Jequitinhonha,Diamantina,-18.242093,-43.594457,47702,3121605,3103,Sudeste
+MG,Vale do Mucuri,Teófilo Otoni,-17.862540,-41.509635,137418,3168606,3104,Sudeste
+MG,Triângulo Mineiro/Alto Paranaíba,Uberlândia,-18.918999,-48.277950,713224,3170206,3105,Sudeste
+MG,Central Mineira,Curvelo,-18.755481,-44.428399,80665,3120904,3106,Sudeste
+MG,Metropolitana de Belo Horizonte,Belo Horizonte,-19.937524,-43.926453,2315560,3106200,3107,Sudeste
+MG,Vale do Rio Doce,Governador Valadares,-18.852882,-41.947081,257171,3127701,3108,Sudeste
+MG,Oeste de Minas,Divinópolis,-20.142074,-44.893886,231091,3122306,3109,Sudeste
+MG,Sul/Sudoeste de Minas,Poços de Caldas,-21.787364,-46.566410,163742,3151800,3110,Sudeste
+MG,Campo das Vertentes,Barbacena,-21.224915,-43.776193,125317,3105608,3111,Sudeste
+MG,Zona da Mata,Juiz de Fora,-21.760924,-43.348817,540756,3136702,3112,Sudeste
+ES,Noroeste Espírito-santense,Colatina,-19.536270,-40.630318,120033,3201506,3201,Sudeste
+ES,Litoral Norte Espírito-santense,Linhares,-19.398106,-40.065306,166786,3203205,3202,Sudeste
+ES,Central Espírito-santense,Serra,-20.156770,-40.275217,520653,3205002,3203,Sudeste
+ES,Sul Espírito-santense,Cachoeiro de Itapemirim,-20.850112,-41.111919,185786,3201209,3204,Sudeste
+RJ,Noroeste Fluminense,Itaperuna,-21.210591,-41.886203,101041,3302205,3301,Sudeste
+RJ,Norte Fluminense,Campos dos Goytacazes,-21.751899,-41.330476,483540,3301009,3302,Sudeste
+RJ,Centro Fluminense,Nova Friburgo,-22.286461,-42.532771,189939,3303401,3303,Sudeste
+RJ,Baixadas,Cabo Frio,-22.880765,-42.020075,222161,3300704,3304,Sudeste
+RJ,Sul Fluminense,Volta Redonda,-22.509968,-44.093522,261563,3306305,3305,Sudeste
+RJ,Metropolitana do Rio de Janeiro,Rio de Janeiro,-22.876652,-43.227875,6211223,3304557,3306,Sudeste
+SP,São José do Rio Preto,São José do Rio Preto,-20.812636,-49.381348,480393,3549805,3501,Sudeste
+SP,Ribeirão Preto,Ribeirão Preto,-21.184835,-47.805476,698642,3543402,3502,Sudeste
+SP,Araçatuba,Araçatuba,-21.205476,-50.439226,200124,3502804,3503,Sudeste
+SP,Bauru,Bauru,-22.325122,-49.083001,379146,3506003,3504,Sudeste
+SP,Araraquara,São Carlos,-22.015998,-47.889238,254857,3548906,3505,Sudeste
+SP,Piracicaba,Piracicaba,-22.723722,-47.646846,423323,3538709,3506,Sudeste
+SP,Campinas,Campinas,-22.907342,-47.060156,1139047,3509502,3507,Sudeste
+SP,Presidente Prudente,Presidente Prudente,-22.122743,-51.386766,225668,3541406,3508,Sudeste
+SP,Marília,Marília,-22.214933,-49.951646,237627,3529005,3509,Sudeste
+SP,Assis,Ourinhos,-22.977267,-49.868580,103970,3534708,3510,Sudeste
+SP,Itapetininga,Itapetininga,-23.587872,-48.046143,157790,3522307,3511,Sudeste
+SP,Macro Metropolitana Paulista,Sorocaba,-23.499323,-47.457853,723682,3552205,3512,Sudeste
+SP,Vale do Paraíba Paulista,São José dos Campos,-23.184061,-45.884175,697054,3549904,3513,Sudeste
+SP,Litoral Sul Paulista,Itanhaém,-24.186121,-46.790991,112476,3522109,3514,Sudeste
+SP,Metropolitana de São Paulo,São Paulo,-23.567387,-46.570383,11451999,3550308,3515,Sudeste
+PR,Noroeste Paranaense,Umuarama,-23.763950,-53.308460,117095,4128104,4101,Sul
+PR,Centro Ocidental Paranaense,Campo Mourão,-24.041223,-52.381115,99432,4104303,4102,Sul
+PR,Norte Central Paranaense,Londrina,-23.312156,-51.162773,555965,4113700,4103,Sul
+PR,Norte Pioneiro Paranaense,Cornélio Procópio,-23.183257,-50.651484,45206,4106407,4104,Sul
+PR,Centro Oriental Paranaense,Ponta Grossa,-25.092547,-50.161442,358371,4119905,4105,Sul
+PR,Oeste Paranaense,Cascavel,-24.953798,-53.459722,348051,4104808,4106,Sul
+PR,Sudoeste Paranaense,Francisco Beltrão,-26.078450,-53.056136,96666,4108403,4107,Sul
+PR,Centro-Sul Paranaense,Guarapuava,-25.393592,-51.463431,182093,4109401,4108,Sul
+PR,Sudeste Paranaense,Irati,-25.473736,-50.658048,59250,4110706,4109,Sul
+PR,Metropolitana de Curitiba,Curitiba,-25.432956,-49.271848,1773718,4106902,4110,Sul
+SC,Oeste Catarinense,Chapecó,-27.106837,-52.617031,254785,4204202,4201,Sul
+SC,Norte Catarinense,Joinville,-26.304518,-48.849409,616317,4209102,4202,Sul
+SC,Serrana,Lages,-27.817259,-50.330222,164981,4209300,4203,Sul
+SC,Vale do Itajaí,Blumenau,-26.916108,-49.057631,361261,4202404,4204,Sul
+SC,Grande Florianópolis,Florianópolis,-27.587796,-48.547637,537211,4205407,4205,Sul
+SC,Sul Catarinense,Criciúma,-28.673572,-49.365940,214493,4204608,4206,Sul
+RS,Noroeste Rio-grandense,Passo Fundo,-28.261767,-52.407095,206215,4314100,4301,Sul
+RS,Nordeste Rio-grandense,Caxias do Sul,-29.166899,-51.178860,463501,4305108,4302,Sul
+RS,Centro Ocidental Rio-grandense,Santa Maria,-29.685582,-53.808675,271735,4316907,4303,Sul
+RS,Centro Oriental Rio-grandense,Santa Cruz do Sul,-29.719768,-52.429929,133230,4316808,4304,Sul
+RS,Metropolitana de Porto Alegre,Porto Alegre,-30.030037,-51.228660,1332845,4314902,4305,Sul
+RS,Sudoeste Rio-grandense,Bagé,-31.330502,-54.107083,117938,4301602,4306,Sul
+RS,Sudeste Rio-grandense,Pelotas,-31.719598,-52.344320,325685,4314407,4307,Sul
+MS,Pantanais Sul Mato-grossense,Corumbá,-19.006375,-57.648985,96268,5003207,5001,Centro-Oeste
+MS,Centro Norte de Mato Grosso do Sul,Campo Grande,-20.458030,-54.615744,898100,5002704,5002,Centro-Oeste
+MS,Leste de Mato Grosso do Sul,Três Lagoas,-20.788679,-51.710001,132152,5008305,5003,Centro-Oeste
+MS,Sudoeste de Mato Grosso do Sul,Dourados,-22.227236,-54.811289,243367,5003702,5004,Centro-Oeste
+MT,Norte Mato-grossense,Sinop,-11.858005,-55.500922,196312,5107909,5101,Centro-Oeste
+MT,Nordeste Mato-grossense,Barra do Garças,-15.888711,-52.260330,69210,5101803,5102,Centro-Oeste
+MT,Sudoeste Mato-grossense,Tangará da Serra,-14.623785,-57.491299,106434,5107958,5103,Centro-Oeste
+MT,Centro-Sul Mato-grossense,Cuiabá,-15.569989,-56.073252,650877,5103403,5104,Centro-Oeste
+MT,Sudeste Mato-grossense,Rondonópolis,-16.470163,-54.633587,244911,5107602,5105,Centro-Oeste
+GO,Noroeste Goiano,Goiás,-15.935743,-50.141384,24071,5208905,5201,Centro-Oeste
+GO,Norte Goiano,Porangatu,-13.442186,-49.146226,44317,5218003,5202,Centro-Oeste
+GO,Centro Goiano,Goiânia,-16.673310,-49.255814,1437366,5208707,5203,Centro-Oeste
+GO,Leste Goiano,Águas Lindas de Goiás,-15.737939,-48.283444,225693,5200258,5204,Centro-Oeste
+GO,Sul Goiano,Rio Verde,-17.794543,-50.929681,225696,5218805,5205,Centro-Oeste
+DF,Distrito Federal,Brasília,-15.794087,-47.887905,2817381,5300108,5301,Centro-Oeste

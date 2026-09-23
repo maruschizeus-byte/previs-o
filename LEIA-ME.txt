@@ -1,0 +1,78 @@
+PREVISÃO POR REGIÃO — HOJE + 7 DIAS
+
+COMO ATUALIZAR NO GITHUB
+1. Substitua gerar_previsao_regiao.py na raiz do repositório.
+2. Substitua .github/workflows/previsao_regioes.yml.
+3. Coloque Cidades_principais_137_mesorregioes_Brasil.csv na raiz do repositório.
+4. Mantenha seus arquivos estados.kml, mesorregioes.kml e a logo.png opcional.
+5. Em Actions > previsao-regioes > Run workflow, use dias: 0 1 2 3 4 5 6 7.
+   Confira os caminhos dos KMLs e do CSV nos campos do formulário.
+
+RESULTADO
+- 0d = hoje; 1d = amanhã; ...; 7d = sete dias depois de hoje.
+- Todos os estados do KML são gerados a cada execução, inclusive quando forem
+  selecionadas somente algumas mesorregiões.
+- Brasil: previsao_regioes/brasil/.
+- Estados: previsao_regioes/UF/.
+- Mesorregiões: previsao_regioes/UF/Nome da mesorregião/.
+- A cidade de referência aparece como ponto e nome nos mapas da mesorregião.
+  A associação prioriza código IBGE, depois nome/UF e, por último, coordenadas.
+- Nos mapas diários, aparece apenas dia da semana e data, por exemplo:
+  qua — 23/set/26. Não há nota de interpolação nem menção ao fuso nas imagens.
+- O domínio dos dados cobre toda a moldura, inclusive o extremo leste do KML.
+  A escala de cores acompanha a altura do mapa.
+
+PERÍODOS E CÁLCULOS
+Todos os dias são calculados no fuso America/Sao_Paulo: de 00:00 do dia indicado
+até 00:00 do dia seguinte (limite final exclusivo). Esse é o horário de Brasília
+para todo o país; o programa não troca para o horário local de cada estado.
+
+A chuva diária é a diferença entre os acumulados nesses dois limites.
+A chuva acumulada começa em hoje, 00:00, e termina no fim do dia indicado.
+Assim, chuva_acumulado_0d é o acumulado de hoje; chuva_acumulado_7d soma os oito
+períodos de hoje até o sétimo dia seguinte.
+
+É selecionada uma única rodada 00/12 UTC, iniciada antes de hoje 00:00 de Brasília.
+O programa tenta primeiro a rodada 00 UTC da data de hoje, depois as anteriores
+em intervalos de 12 horas, até quatro candidatas. A rodada escolhida precisa
+ter dados para o horizonte final. A presença de um passo final não substitui a
+verificação dos demais: se faltar algum campo necessário, o processo falha e o
+workflow não publica uma execução parcial como se estivesse completa.
+
+Até 144 horas, o ECMWF oferece os passos usados aqui de 3 em 3 horas; depois,
+de 6 em 6 horas. Quando um limite de dia não coincide com um horário nativo,
+a precipitação acumulada é interpolada linearmente entre os horários vizinhos.
+Isso equivale a distribuir proporcionalmente a chuva dentro desse intervalo.
+Os períodos continuam sendo de 00:00 a 00:00 de Brasília, mas a separação da
+chuva perto desses limites é uma estimativa. A informação é registrada em
+previsao.json, sem adicionar aviso à imagem, conforme solicitado.
+
+Temperaturas mínima/máxima são estimadas entre as amostras de temperatura a 2 m
+dentro do dia. Não representam extremos horários nativos do modelo.
+Nuvens é a média diária ponderada pelo tempo, calculada por integração trapezoidal
+dos campos instantâneos, incluindo os limites interpolados quando necessário.
+Todos os mapas são previsões; as horas já passadas de hoje não são substituídas
+por observações de estações.
+
+CONFERÊNCIA
+O arquivo previsao_regioes/previsao.json registra data local, início/fim de cada
+período, rodada utilizada, variáveis e indicadores de interpolação.
+regioes.json e os regiao.json identificam as pastas e não atestam atualização
+meteorológica por si só.
+
+Para conferir somente KMLs, cidades e pastas, sem acessar o ECMWF:
+python gerar_previsao_regiao.py --todas-meso --kml estados.kml mesorregioes.kml --fundo estados.kml --kml-meso mesorregioes.kml --somente-estrutura
+
+VALIDAÇÃO DESTA ENTREGA
+Foram verificados 16 cenários automatizados: períodos de Brasília, dia atual,
+virada de mês/ano, interpolação, rodada única, cache, média de nuvens, temperaturas,
+cidades do CSV real, estados obrigatórios, renderização de PNGs e workflow.
+A renderização usou dados meteorológicos e polígonos simulados. Os KMLs reais do
+repositório não estavam disponíveis nesta conversa, e a coleta real de GRIBs não
+foi executada neste ambiente. A execução real ocorre no GitHub Actions.
+
+REFERÊNCIAS TÉCNICAS
+Catálogo de parâmetros e passos ECMWF:
+https://www.ecmwf.int/en/forecasts/datasets/open-data
+Cliente oficial de acesso ao ECMWF:
+https://github.com/ecmwf/ecmwf-opendata

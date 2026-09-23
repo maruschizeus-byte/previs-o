@@ -7,6 +7,8 @@ name: previsao-regioes
 # Uso manual: aba Actions > previsao-regioes > Run workflow.
 #   - "Todas as mesorregiões" já vem marcado -> é só clicar em Run.
 #   - Para gerar só algumas regiões, DESMARQUE e preencha "Regiões".
+#   - Confira os caminhos dos KMLs, inclusive letras maiúsculas/minúsculas.
+#   - As pastas incluem regiao.json e são preparadas antes dos downloads.
 
 on:
   workflow_dispatch:
@@ -28,6 +30,14 @@ on:
         description: "Recortar o preenchimento ao contorno da região"
         type: boolean
         default: false
+      kml_estados:
+        description: "Caminho do KML de estados no repositório"
+        type: string
+        default: "estados.kml"
+      kml_meso:
+        description: "Caminho do KML de mesorregiões no repositório"
+        type: string
+        default: "mesorregioes.kml"
   schedule:
     # 06:05 de Brasília (BRT = UTC-3, sem horário de verão) = 09:05 UTC, todo dia.
     - cron: "5 9 * * *"
@@ -69,39 +79,57 @@ jobs:
           path: .cache_ecmwf
           key: ecmwf-cache-${{ steps.dt.outputs.d }}
 
-      - name: gerar figuras
+      - name: validar KMLs, criar pastas e gerar figuras
         env:
-          TODAS:   ${{ github.event.inputs.todas_meso || 'true' }}
-          DIAS:    ${{ github.event.inputs.dias       || '1 2 3 4 5 6 7' }}
-          VARS:    ${{ github.event.inputs.vars       || 'chuva tmin tmax nuvem' }}
-          REGIOES: ${{ github.event.inputs.regioes    || '' }}
+          TODAS:   ${{ github.event_name == 'schedule' || inputs.todas_meso }}
+          DIAS:    ${{ inputs.dias    || '1 2 3 4 5 6 7' }}
+          VARS:    ${{ inputs.vars    || 'chuva tmin tmax nuvem' }}
+          REGIOES: ${{ inputs.regioes || '' }}
+          RECORTAR: ${{ inputs.recortar || false }}
+          KML_ESTADOS: ${{ inputs.kml_estados || 'estados.kml' }}
+          KML_MESO: ${{ inputs.kml_meso || 'mesorregioes.kml' }}
         run: |
-          set -e
-          # fixos: KML de busca, fundo = estados, logo; fonte usa os espelhos
-          # (padrão do script: aws azure ecmwf).
-          if [ "$TODAS" = "true" ] || [ -z "$REGIOES" ]; then
-            python -u gerar_previsao_regiao.py \
-              --todas-meso --todos-estados \
-              --kml estados.kml mesorregioes.kml \
-              --fundo estados.kml \
-              --logo logo.png \
-              --vars $VARS --dias $DIAS \
-              --saida previsao_regioes
+          set -euo pipefail
+          read -r -a dias_args <<< "$DIAS"
+          read -r -a vars_args <<< "$VARS"
+          args=(
+            --kml "$KML_ESTADOS" "$KML_MESO"
+            --fundo "$KML_ESTADOS"
+            --kml-meso "$KML_MESO"
+            --logo logo.png
+            --vars "${vars_args[@]}" --dias "${dias_args[@]}"
+            --saida previsao_regioes
+          )
+          if [ "$TODAS" = "true" ]; then
+            args+=(--todas-meso --todos-estados)
+          elif [ -n "$REGIOES" ]; then
+            args+=(--regioes "$REGIOES")
           else
-            python -u gerar_previsao_regiao.py \
-              --regioes "$REGIOES" \
-              --kml estados.kml mesorregioes.kml \
-              --fundo estados.kml \
-              --logo logo.png \
-              --vars $VARS --dias $DIAS \
-              --saida previsao_regioes
+            echo "::error::Marque Todas as mesorregiões ou preencha Regiões."
+            exit 1
           fi
+          if [ "$RECORTAR" = "true" ]; then
+            args+=(--recortar)
+          fi
+          # Confere a separação dos KMLs sem depender do ECMWF.
+          python -u gerar_previsao_regiao.py "${args[@]}" --somente-estrutura
+          python -u gerar_previsao_regiao.py "${args[@]}"
 
-      - name: commit e push (à prova de conflito)
+      - name: guardar mapas e estrutura para download
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: previsao-regioes-${{ github.run_id }}-${{ github.run_attempt }}
+          path: previsao_regioes/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: commit e push das pastas e mapas
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add previsao_regioes
+          git add -A previsao_regioes
           if git diff --cached --quiet; then
             echo "Sem mudanças para commitar."; exit 0
           fi

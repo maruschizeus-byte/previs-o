@@ -19,7 +19,7 @@ on:
         default: true
       dias:
         description: "Dias de previsão"
-        default: "1 2 3 4 5 6 7"
+        default: "0 1 2 3 4 5 6 7"
       vars:
         description: "Variáveis: chuva tmin tmax nuvem"
         default: "chuva tmin tmax nuvem"

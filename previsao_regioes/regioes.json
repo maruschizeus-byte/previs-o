@@ -1,0 +1,1160 @@
+{
+  "total": 165,
+  "regioes": [
+    {
+      "nome": "Brasil",
+      "tipo": "brasil",
+      "uf": null,
+      "arquivo_kml": null,
+      "pasta": "brasil"
+    },
+    {
+      "nome": "Rio Grande do Sul",
+      "tipo": "estado",
+      "uf": "RS",
+      "arquivo_kml": "estados.kml",
+      "pasta": "RS"
+    },
+    {
+      "nome": "São Paulo",
+      "tipo": "estado",
+      "uf": "SP",
+      "arquivo_kml": "estados.kml",
+      "pasta": "SP"
+    },
+    {
+      "nome": "Espírito Santo",
+      "tipo": "estado",
+      "uf": "ES",
+      "arquivo_kml": "estados.kml",
+      "pasta": "ES"
+    },
+    {
+      "nome": "Rio de Janeiro",
+      "tipo": "estado",
+      "uf": "RJ",
+      "arquivo_kml": "estados.kml",
+      "pasta": "RJ"
+    },
+    {
+      "nome": "Paraná",
+      "tipo": "estado",
+      "uf": "PR",
+      "arquivo_kml": "estados.kml",
+      "pasta": "PR"
+    },
+    {
+      "nome": "Santa Catarina",
+      "tipo": "estado",
+      "uf": "SC",
+      "arquivo_kml": "estados.kml",
+      "pasta": "SC"
+    },
+    {
+      "nome": "Minas Gerais",
+      "tipo": "estado",
+      "uf": "MG",
+      "arquivo_kml": "estados.kml",
+      "pasta": "MG"
+    },
+    {
+      "nome": "Ceará",
+      "tipo": "estado",
+      "uf": "CE",
+      "arquivo_kml": "estados.kml",
+      "pasta": "CE"
+    },
+    {
+      "nome": "Goiás",
+      "tipo": "estado",
+      "uf": "GO",
+      "arquivo_kml": "estados.kml",
+      "pasta": "GO"
+    },
+    {
+      "nome": "Rio Grande do Norte",
+      "tipo": "estado",
+      "uf": "RN",
+      "arquivo_kml": "estados.kml",
+      "pasta": "RN"
+    },
+    {
+      "nome": "Maranhão",
+      "tipo": "estado",
+      "uf": "MA",
+      "arquivo_kml": "estados.kml",
+      "pasta": "MA"
+    },
+    {
+      "nome": "Distrito Federal",
+      "tipo": "estado",
+      "uf": "DF",
+      "arquivo_kml": "estados.kml",
+      "pasta": "DF"
+    },
+    {
+      "nome": "Piauí",
+      "tipo": "estado",
+      "uf": "PI",
+      "arquivo_kml": "estados.kml",
+      "pasta": "PI"
+    },
+    {
+      "nome": "Mato Grosso do Sul",
+      "tipo": "estado",
+      "uf": "MS",
+      "arquivo_kml": "estados.kml",
+      "pasta": "MS"
+    },
+    {
+      "nome": "Mato Grosso",
+      "tipo": "estado",
+      "uf": "MT",
+      "arquivo_kml": "estados.kml",
+      "pasta": "MT"
+    },
+    {
+      "nome": "Alagoas",
+      "tipo": "estado",
+      "uf": "AL",
+      "arquivo_kml": "estados.kml",
+      "pasta": "AL"
+    },
+    {
+      "nome": "Acre",
+      "tipo": "estado",
+      "uf": "AC",
+      "arquivo_kml": "estados.kml",
+      "pasta": "AC"
+    },
+    {
+      "nome": "Sergipe",
+      "tipo": "estado",
+      "uf": "SE",
+      "arquivo_kml": "estados.kml",
+      "pasta": "SE"
+    },
+    {
+      "nome": "Amazonas",
+      "tipo": "estado",
+      "uf": "AM",
+      "arquivo_kml": "estados.kml",
+      "pasta": "AM"
+    },
+    {
+      "nome": "Paraíba",
+      "tipo": "estado",
+      "uf": "PB",
+      "arquivo_kml": "estados.kml",
+      "pasta": "PB"
+    },
+    {
+      "nome": "Pernambuco",
+      "tipo": "estado",
+      "uf": "PE",
+      "arquivo_kml": "estados.kml",
+      "pasta": "PE"
+    },
+    {
+      "nome": "Rondônia",
+      "tipo": "estado",
+      "uf": "RO",
+      "arquivo_kml": "estados.kml",
+      "pasta": "RO"
+    },
+    {
+      "nome": "Amapá",
+      "tipo": "estado",
+      "uf": "AP",
+      "arquivo_kml": "estados.kml",
+      "pasta": "AP"
+    },
+    {
+      "nome": "Tocantins",
+      "tipo": "estado",
+      "uf": "TO",
+      "arquivo_kml": "estados.kml",
+      "pasta": "TO"
+    },
+    {
+      "nome": "Bahia",
+      "tipo": "estado",
+      "uf": "BA",
+      "arquivo_kml": "estados.kml",
+      "pasta": "BA"
+    },
+    {
+      "nome": "Roraima",
+      "tipo": "estado",
+      "uf": "RR",
+      "arquivo_kml": "estados.kml",
+      "pasta": "RR"
+    },
+    {
+      "nome": "Pará",
+      "tipo": "estado",
+      "uf": "PA",
+      "arquivo_kml": "estados.kml",
+      "pasta": "PA"
+    },
+    {
+      "nome": "AGRESTE SERGIPANO",
+      "tipo": "mesorregiao",
+      "uf": "SE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SE/AGRESTE SERGIPANO"
+    },
+    {
+      "nome": "LESTE SERGIPANO",
+      "tipo": "mesorregiao",
+      "uf": "SE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SE/LESTE SERGIPANO"
+    },
+    {
+      "nome": "SERTÃO SERGIPANO",
+      "tipo": "mesorregiao",
+      "uf": "SE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SE/SERTÃO SERGIPANO"
+    },
+    {
+      "nome": "CENTRO NORTE BAIANO",
+      "tipo": "mesorregiao",
+      "uf": "BA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "BA/CENTRO NORTE BAIANO"
+    },
+    {
+      "nome": "CENTRO SUL BAIANO",
+      "tipo": "mesorregiao",
+      "uf": "BA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "BA/CENTRO SUL BAIANO"
+    },
+    {
+      "nome": "EXTREMO OESTE BAIANO",
+      "tipo": "mesorregiao",
+      "uf": "BA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "BA/EXTREMO OESTE BAIANO"
+    },
+    {
+      "nome": "METROPOLITANA DE SALVADOR",
+      "tipo": "mesorregiao",
+      "uf": "BA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "BA/METROPOLITANA DE SALVADOR"
+    },
+    {
+      "nome": "NORDESTE BAIANO",
+      "tipo": "mesorregiao",
+      "uf": "BA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "BA/NORDESTE BAIANO"
+    },
+    {
+      "nome": "SUL BAIANO",
+      "tipo": "mesorregiao",
+      "uf": "BA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "BA/SUL BAIANO"
+    },
+    {
+      "nome": "VALE SÃO-FRANCISCANO DA BAHIA",
+      "tipo": "mesorregiao",
+      "uf": "BA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "BA/VALE SÃO-FRANCISCANO DA BAHIA"
+    },
+    {
+      "nome": "CAMPO DAS VERTENTES",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/CAMPO DAS VERTENTES"
+    },
+    {
+      "nome": "CENTRAL MINEIRA",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/CENTRAL MINEIRA"
+    },
+    {
+      "nome": "JEQUITINHONHA",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/JEQUITINHONHA"
+    },
+    {
+      "nome": "METROPOLITANA DE BELO HORIZONTE",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/METROPOLITANA DE BELO HORIZONTE"
+    },
+    {
+      "nome": "NOROESTE DE MINAS",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/NOROESTE DE MINAS"
+    },
+    {
+      "nome": "NORTE DE MINAS",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/NORTE DE MINAS"
+    },
+    {
+      "nome": "OESTE DE MINAS",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/OESTE DE MINAS"
+    },
+    {
+      "nome": "SUL/SUDOESTE DE MINAS",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/SUL-SUDOESTE DE MINAS"
+    },
+    {
+      "nome": "TRIÂNGULO MINEIRO/ALTO PARANAÍBA",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/TRIÂNGULO MINEIRO-ALTO PARANAÍBA"
+    },
+    {
+      "nome": "VALE DO MUCURI",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/VALE DO MUCURI"
+    },
+    {
+      "nome": "VALE DO RIO DOCE",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/VALE DO RIO DOCE"
+    },
+    {
+      "nome": "ZONA DA MATA",
+      "tipo": "mesorregiao",
+      "uf": "MG",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MG/ZONA DA MATA"
+    },
+    {
+      "nome": "CENTRAL ESPÍRITO-SANTENSE",
+      "tipo": "mesorregiao",
+      "uf": "ES",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "ES/CENTRAL ESPÍRITO-SANTENSE"
+    },
+    {
+      "nome": "LITORAL NORTE ESPÍRITO-SANTENSE",
+      "tipo": "mesorregiao",
+      "uf": "ES",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "ES/LITORAL NORTE ESPÍRITO-SANTENSE"
+    },
+    {
+      "nome": "NOROESTE ESPÍRITO-SANTENSE",
+      "tipo": "mesorregiao",
+      "uf": "ES",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "ES/NOROESTE ESPÍRITO-SANTENSE"
+    },
+    {
+      "nome": "SUL ESPÍRITO-SANTENSE",
+      "tipo": "mesorregiao",
+      "uf": "ES",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "ES/SUL ESPÍRITO-SANTENSE"
+    },
+    {
+      "nome": "BAIXADAS",
+      "tipo": "mesorregiao",
+      "uf": "RJ",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RJ/BAIXADAS"
+    },
+    {
+      "nome": "CENTRO FLUMINENSE",
+      "tipo": "mesorregiao",
+      "uf": "RJ",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RJ/CENTRO FLUMINENSE"
+    },
+    {
+      "nome": "METROPOLITANA DO RIO DE JANEIRO",
+      "tipo": "mesorregiao",
+      "uf": "RJ",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RJ/METROPOLITANA DO RIO DE JANEIRO"
+    },
+    {
+      "nome": "NOROESTE FLUMINENSE",
+      "tipo": "mesorregiao",
+      "uf": "RJ",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RJ/NOROESTE FLUMINENSE"
+    },
+    {
+      "nome": "NORTE FLUMINENSE",
+      "tipo": "mesorregiao",
+      "uf": "RJ",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RJ/NORTE FLUMINENSE"
+    },
+    {
+      "nome": "SUL FLUMINENSE",
+      "tipo": "mesorregiao",
+      "uf": "RJ",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RJ/SUL FLUMINENSE"
+    },
+    {
+      "nome": "ARAÇATUBA",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/ARAÇATUBA"
+    },
+    {
+      "nome": "ARARAQUARA",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/ARARAQUARA"
+    },
+    {
+      "nome": "ASSIS",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/ASSIS"
+    },
+    {
+      "nome": "BAURU",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/BAURU"
+    },
+    {
+      "nome": "CAMPINAS",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/CAMPINAS"
+    },
+    {
+      "nome": "ITAPETININGA",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/ITAPETININGA"
+    },
+    {
+      "nome": "LITORAL SUL PAULISTA",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/LITORAL SUL PAULISTA"
+    },
+    {
+      "nome": "MACRO METROPOLITANA PAULISTA",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/MACRO METROPOLITANA PAULISTA"
+    },
+    {
+      "nome": "MARÍLIA",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/MARÍLIA"
+    },
+    {
+      "nome": "METROPOLITANA DE SÃO PAULO",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/METROPOLITANA DE SÃO PAULO"
+    },
+    {
+      "nome": "PIRACICABA",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/PIRACICABA"
+    },
+    {
+      "nome": "PRESIDENTE PRUDENTE",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/PRESIDENTE PRUDENTE"
+    },
+    {
+      "nome": "RIBEIRÃO PRETO",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/RIBEIRÃO PRETO"
+    },
+    {
+      "nome": "SÃO JOSÉ DO RIO PRETO",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/SÃO JOSÉ DO RIO PRETO"
+    },
+    {
+      "nome": "VALE DO PARAÍBA PAULISTA",
+      "tipo": "mesorregiao",
+      "uf": "SP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SP/VALE DO PARAÍBA PAULISTA"
+    },
+    {
+      "nome": "CENTRO-SUL PARANAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PR/CENTRO-SUL PARANAENSE"
+    },
+    {
+      "nome": "CENTRO OCIDENTAL PARANAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PR/CENTRO OCIDENTAL PARANAENSE"
+    },
+    {
+      "nome": "CENTRO ORIENTAL PARANAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PR/CENTRO ORIENTAL PARANAENSE"
+    },
+    {
+      "nome": "METROPOLITANA DE CURITIBA",
+      "tipo": "mesorregiao",
+      "uf": "PR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PR/METROPOLITANA DE CURITIBA"
+    },
+    {
+      "nome": "NOROESTE PARANAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PR/NOROESTE PARANAENSE"
+    },
+    {
+      "nome": "NORTE CENTRAL PARANAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PR/NORTE CENTRAL PARANAENSE"
+    },
+    {
+      "nome": "NORTE PIONEIRO PARANAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PR/NORTE PIONEIRO PARANAENSE"
+    },
+    {
+      "nome": "OESTE PARANAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PR/OESTE PARANAENSE"
+    },
+    {
+      "nome": "SUDESTE PARANAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PR/SUDESTE PARANAENSE"
+    },
+    {
+      "nome": "SUDOESTE PARANAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PR/SUDOESTE PARANAENSE"
+    },
+    {
+      "nome": "GRANDE FLORIANÓPOLIS",
+      "tipo": "mesorregiao",
+      "uf": "SC",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SC/GRANDE FLORIANÓPOLIS"
+    },
+    {
+      "nome": "NORTE CATARINENSE",
+      "tipo": "mesorregiao",
+      "uf": "SC",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SC/NORTE CATARINENSE"
+    },
+    {
+      "nome": "OESTE CATARINENSE",
+      "tipo": "mesorregiao",
+      "uf": "SC",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SC/OESTE CATARINENSE"
+    },
+    {
+      "nome": "SERRANA",
+      "tipo": "mesorregiao",
+      "uf": "SC",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SC/SERRANA"
+    },
+    {
+      "nome": "SUL CATARINENSE",
+      "tipo": "mesorregiao",
+      "uf": "SC",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SC/SUL CATARINENSE"
+    },
+    {
+      "nome": "VALE DO ITAJAÍ",
+      "tipo": "mesorregiao",
+      "uf": "SC",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "SC/VALE DO ITAJAÍ"
+    },
+    {
+      "nome": "CENTRO OCIDENTAL RIO-GRANDENSE",
+      "tipo": "mesorregiao",
+      "uf": "RS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RS/CENTRO OCIDENTAL RIO-GRANDENSE"
+    },
+    {
+      "nome": "CENTRO ORIENTAL RIO-GRANDENSE",
+      "tipo": "mesorregiao",
+      "uf": "RS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RS/CENTRO ORIENTAL RIO-GRANDENSE"
+    },
+    {
+      "nome": "METROPOLITANA DE PORTO ALEGRE",
+      "tipo": "mesorregiao",
+      "uf": "RS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RS/METROPOLITANA DE PORTO ALEGRE"
+    },
+    {
+      "nome": "NORDESTE RIO-GRANDENSE",
+      "tipo": "mesorregiao",
+      "uf": "RS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RS/NORDESTE RIO-GRANDENSE"
+    },
+    {
+      "nome": "NOROESTE RIO-GRANDENSE",
+      "tipo": "mesorregiao",
+      "uf": "RS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RS/NOROESTE RIO-GRANDENSE"
+    },
+    {
+      "nome": "SUDESTE RIO-GRANDENSE",
+      "tipo": "mesorregiao",
+      "uf": "RS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RS/SUDESTE RIO-GRANDENSE"
+    },
+    {
+      "nome": "SUDOESTE RIO-GRANDENSE",
+      "tipo": "mesorregiao",
+      "uf": "RS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RS/SUDOESTE RIO-GRANDENSE"
+    },
+    {
+      "nome": "CENTRO NORTE DE MATO GROSSO DO SUL",
+      "tipo": "mesorregiao",
+      "uf": "MS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MS/CENTRO NORTE DE MATO GROSSO DO SUL"
+    },
+    {
+      "nome": "LESTE DE MATO GROSSO DO SUL",
+      "tipo": "mesorregiao",
+      "uf": "MS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MS/LESTE DE MATO GROSSO DO SUL"
+    },
+    {
+      "nome": "PANTANAIS SUL MATO-GROSSENSE",
+      "tipo": "mesorregiao",
+      "uf": "MS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MS/PANTANAIS SUL MATO-GROSSENSE"
+    },
+    {
+      "nome": "SUDOESTE DE MATO GROSSO DO SUL",
+      "tipo": "mesorregiao",
+      "uf": "MS",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MS/SUDOESTE DE MATO GROSSO DO SUL"
+    },
+    {
+      "nome": "CENTRO-SUL MATO-GROSSENSE",
+      "tipo": "mesorregiao",
+      "uf": "MT",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MT/CENTRO-SUL MATO-GROSSENSE"
+    },
+    {
+      "nome": "NORDESTE MATO-GROSSENSE",
+      "tipo": "mesorregiao",
+      "uf": "MT",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MT/NORDESTE MATO-GROSSENSE"
+    },
+    {
+      "nome": "NORTE MATO-GROSSENSE",
+      "tipo": "mesorregiao",
+      "uf": "MT",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MT/NORTE MATO-GROSSENSE"
+    },
+    {
+      "nome": "SUDESTE MATO-GROSSENSE",
+      "tipo": "mesorregiao",
+      "uf": "MT",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MT/SUDESTE MATO-GROSSENSE"
+    },
+    {
+      "nome": "SUDOESTE MATO-GROSSENSE",
+      "tipo": "mesorregiao",
+      "uf": "MT",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MT/SUDOESTE MATO-GROSSENSE"
+    },
+    {
+      "nome": "CENTRO GOIANO",
+      "tipo": "mesorregiao",
+      "uf": "GO",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "GO/CENTRO GOIANO"
+    },
+    {
+      "nome": "LESTE GOIANO",
+      "tipo": "mesorregiao",
+      "uf": "GO",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "GO/LESTE GOIANO"
+    },
+    {
+      "nome": "NOROESTE GOIANO",
+      "tipo": "mesorregiao",
+      "uf": "GO",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "GO/NOROESTE GOIANO"
+    },
+    {
+      "nome": "NORTE GOIANO",
+      "tipo": "mesorregiao",
+      "uf": "GO",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "GO/NORTE GOIANO"
+    },
+    {
+      "nome": "SUL GOIANO",
+      "tipo": "mesorregiao",
+      "uf": "GO",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "GO/SUL GOIANO"
+    },
+    {
+      "nome": "DISTRITO FEDERAL",
+      "tipo": "mesorregiao",
+      "uf": "DF",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "DF/DISTRITO FEDERAL"
+    },
+    {
+      "nome": "LESTE RONDONIENSE",
+      "tipo": "mesorregiao",
+      "uf": "RO",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RO/LESTE RONDONIENSE"
+    },
+    {
+      "nome": "MADEIRA-GUAPORÉ",
+      "tipo": "mesorregiao",
+      "uf": "RO",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RO/MADEIRA-GUAPORÉ"
+    },
+    {
+      "nome": "VALE DO ACRE",
+      "tipo": "mesorregiao",
+      "uf": "AC",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AC/VALE DO ACRE"
+    },
+    {
+      "nome": "VALE DO JURÁ",
+      "tipo": "mesorregiao",
+      "uf": "AC",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AC/VALE DO JURÁ"
+    },
+    {
+      "nome": "CENTRO AMAZONENSE",
+      "tipo": "mesorregiao",
+      "uf": "AM",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AM/CENTRO AMAZONENSE"
+    },
+    {
+      "nome": "NORTE AMAZONENSE",
+      "tipo": "mesorregiao",
+      "uf": "AM",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AM/NORTE AMAZONENSE"
+    },
+    {
+      "nome": "SUDOESTE AMAZONENSE",
+      "tipo": "mesorregiao",
+      "uf": "AM",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AM/SUDOESTE AMAZONENSE"
+    },
+    {
+      "nome": "SUL AMAZONENSE",
+      "tipo": "mesorregiao",
+      "uf": "AM",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AM/SUL AMAZONENSE"
+    },
+    {
+      "nome": "NORTE DE RORAIMA",
+      "tipo": "mesorregiao",
+      "uf": "RR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RR/NORTE DE RORAIMA"
+    },
+    {
+      "nome": "SUL DE RORAIMA",
+      "tipo": "mesorregiao",
+      "uf": "RR",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RR/SUL DE RORAIMA"
+    },
+    {
+      "nome": "BAIXO AMAZONAS",
+      "tipo": "mesorregiao",
+      "uf": "PA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PA/BAIXO AMAZONAS"
+    },
+    {
+      "nome": "MARAJÓ",
+      "tipo": "mesorregiao",
+      "uf": "PA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PA/MARAJÓ"
+    },
+    {
+      "nome": "METROPOLITANA DE BELÉM",
+      "tipo": "mesorregiao",
+      "uf": "PA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PA/METROPOLITANA DE BELÉM"
+    },
+    {
+      "nome": "NORDESTE PARAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PA/NORDESTE PARAENSE"
+    },
+    {
+      "nome": "SUDESTE PARAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PA/SUDESTE PARAENSE"
+    },
+    {
+      "nome": "SUDOESTE PARAENSE",
+      "tipo": "mesorregiao",
+      "uf": "PA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PA/SUDOESTE PARAENSE"
+    },
+    {
+      "nome": "NORTE DO AMAPÁ",
+      "tipo": "mesorregiao",
+      "uf": "AP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AP/NORTE DO AMAPÁ"
+    },
+    {
+      "nome": "SUL DO AMAPÁ",
+      "tipo": "mesorregiao",
+      "uf": "AP",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AP/SUL DO AMAPÁ"
+    },
+    {
+      "nome": "OCIDENTAL DO TOCANTINS",
+      "tipo": "mesorregiao",
+      "uf": "TO",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "TO/OCIDENTAL DO TOCANTINS"
+    },
+    {
+      "nome": "ORIENTAL DO TOCANTINS",
+      "tipo": "mesorregiao",
+      "uf": "TO",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "TO/ORIENTAL DO TOCANTINS"
+    },
+    {
+      "nome": "CENTRO MARANHENSE",
+      "tipo": "mesorregiao",
+      "uf": "MA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MA/CENTRO MARANHENSE"
+    },
+    {
+      "nome": "LESTE MARANHENSE",
+      "tipo": "mesorregiao",
+      "uf": "MA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MA/LESTE MARANHENSE"
+    },
+    {
+      "nome": "NORTE MARANHENSE",
+      "tipo": "mesorregiao",
+      "uf": "MA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MA/NORTE MARANHENSE"
+    },
+    {
+      "nome": "OESTE MARANHENSE",
+      "tipo": "mesorregiao",
+      "uf": "MA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MA/OESTE MARANHENSE"
+    },
+    {
+      "nome": "SUL MARANHENSE",
+      "tipo": "mesorregiao",
+      "uf": "MA",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "MA/SUL MARANHENSE"
+    },
+    {
+      "nome": "CENTRO-NORTE PIAUIENSE",
+      "tipo": "mesorregiao",
+      "uf": "PI",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PI/CENTRO-NORTE PIAUIENSE"
+    },
+    {
+      "nome": "NORTE PIAUIENSE",
+      "tipo": "mesorregiao",
+      "uf": "PI",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PI/NORTE PIAUIENSE"
+    },
+    {
+      "nome": "SUDESTE PIAUIENSE",
+      "tipo": "mesorregiao",
+      "uf": "PI",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PI/SUDESTE PIAUIENSE"
+    },
+    {
+      "nome": "SUDOESTE PIAUIENSE",
+      "tipo": "mesorregiao",
+      "uf": "PI",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PI/SUDOESTE PIAUIENSE"
+    },
+    {
+      "nome": "CENTRO-SUL CEARENSE",
+      "tipo": "mesorregiao",
+      "uf": "CE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "CE/CENTRO-SUL CEARENSE"
+    },
+    {
+      "nome": "JAGUARIBE",
+      "tipo": "mesorregiao",
+      "uf": "CE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "CE/JAGUARIBE"
+    },
+    {
+      "nome": "METROPOLITANA DE FORTALEZA",
+      "tipo": "mesorregiao",
+      "uf": "CE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "CE/METROPOLITANA DE FORTALEZA"
+    },
+    {
+      "nome": "NOROESTE CEARENSE",
+      "tipo": "mesorregiao",
+      "uf": "CE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "CE/NOROESTE CEARENSE"
+    },
+    {
+      "nome": "NORTE CEARENSE",
+      "tipo": "mesorregiao",
+      "uf": "CE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "CE/NORTE CEARENSE"
+    },
+    {
+      "nome": "SERTÕES CEARENSES",
+      "tipo": "mesorregiao",
+      "uf": "CE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "CE/SERTÕES CEARENSES"
+    },
+    {
+      "nome": "SUL CEARENSE",
+      "tipo": "mesorregiao",
+      "uf": "CE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "CE/SUL CEARENSE"
+    },
+    {
+      "nome": "AGRESTE POTIGUAR",
+      "tipo": "mesorregiao",
+      "uf": "RN",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RN/AGRESTE POTIGUAR"
+    },
+    {
+      "nome": "CENTRAL POTIGUAR",
+      "tipo": "mesorregiao",
+      "uf": "RN",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RN/CENTRAL POTIGUAR"
+    },
+    {
+      "nome": "LESTE POTIGUAR",
+      "tipo": "mesorregiao",
+      "uf": "RN",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RN/LESTE POTIGUAR"
+    },
+    {
+      "nome": "OESTE POTIGUAR",
+      "tipo": "mesorregiao",
+      "uf": "RN",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "RN/OESTE POTIGUAR"
+    },
+    {
+      "nome": "AGRESTE PARAIBANO",
+      "tipo": "mesorregiao",
+      "uf": "PB",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PB/AGRESTE PARAIBANO"
+    },
+    {
+      "nome": "BORBOREMA",
+      "tipo": "mesorregiao",
+      "uf": "PB",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PB/BORBOREMA"
+    },
+    {
+      "nome": "MATA PARAIBANA",
+      "tipo": "mesorregiao",
+      "uf": "PB",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PB/MATA PARAIBANA"
+    },
+    {
+      "nome": "SERTÃO PARAIBANO",
+      "tipo": "mesorregiao",
+      "uf": "PB",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PB/SERTÃO PARAIBANO"
+    },
+    {
+      "nome": "AGRESTE PERNAMBUCANO",
+      "tipo": "mesorregiao",
+      "uf": "PE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PE/AGRESTE PERNAMBUCANO"
+    },
+    {
+      "nome": "MATA PERNAMBUCANA",
+      "tipo": "mesorregiao",
+      "uf": "PE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PE/MATA PERNAMBUCANA"
+    },
+    {
+      "nome": "METROPOLITANA DE RECIFE",
+      "tipo": "mesorregiao",
+      "uf": "PE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PE/METROPOLITANA DE RECIFE"
+    },
+    {
+      "nome": "SÃO FRANCISCO PERNAMBUCANO",
+      "tipo": "mesorregiao",
+      "uf": "PE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PE/SÃO FRANCISCO PERNAMBUCANO"
+    },
+    {
+      "nome": "SERTÃO PERNAMBUCANO",
+      "tipo": "mesorregiao",
+      "uf": "PE",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "PE/SERTÃO PERNAMBUCANO"
+    },
+    {
+      "nome": "AGRESTE ALAGOANO",
+      "tipo": "mesorregiao",
+      "uf": "AL",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AL/AGRESTE ALAGOANO"
+    },
+    {
+      "nome": "LESTE ALAGOANO",
+      "tipo": "mesorregiao",
+      "uf": "AL",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AL/LESTE ALAGOANO"
+    },
+    {
+      "nome": "SERTÃO ALAGOANO",
+      "tipo": "mesorregiao",
+      "uf": "AL",
+      "arquivo_kml": "mesorregioes.kml",
+      "pasta": "AL/SERTÃO ALAGOANO"
+    }
+  ]
+}

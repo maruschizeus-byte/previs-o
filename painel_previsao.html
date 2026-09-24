@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Previsão por região</title>
+<style>
+:root{--ink:#18332f;--muted:#667772;--green:#087d68;--green-dark:#075d50;--pale:#e6f3ee;--line:#dce5df;--paper:#fff;--bg:#f2f5f2;--warn:#93611e;--shadow:0 8px 28px #15372a08}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5}
+button,select,a{touch-action:manipulation}button,select{font:inherit;color:inherit}
+button,a,select{outline-offset:4px}button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #38a38b}
+button{cursor:pointer}button:disabled,select:disabled{cursor:default;opacity:.45}button,a,select{ -webkit-tap-highlight-color:transparent }
+[hidden]{display:none!important}.top{background:#143d33;color:#fff;padding:22px max(24px,calc((100vw - 1360px)/2));display:flex;align-items:center;justify-content:space-between;gap:18px}
+.brand{display:flex;gap:13px;align-items:center}.brand-mark{width:42px;height:42px;border:1px solid #79a59666;border-radius:13px;display:grid;place-items:center;color:#9ce2c8}
+.brand h1{font-size:21px;letter-spacing:-.5px;margin:0;line-height:1.3}.brand p{font-size:11px;letter-spacing:1.4px;color:#afd0c1;margin:4px 0 0;text-transform:uppercase}
+.top-meta{display:flex;gap:15px;align-items:center}.source-tag{font-size:11px;letter-spacing:1px;border:1px solid #93baaa70;padding:5px 10px;border-radius:7px}.updated{color:#c4dbcf;font-size:12px;text-align:right}
+.page{max-width:1408px;margin:auto;padding:24px}.intro{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:0 0 20px}
+.intro p{margin:0;color:var(--muted);font-size:14px}.text-button{background:none;border:0;color:var(--green-dark);font-weight:600;padding:8px 2px;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.filters{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:19px 22px;display:grid;grid-template-columns:1fr 1.45fr 1fr;gap:22px;box-shadow:var(--shadow);margin-bottom:18px}
+.field{min-width:0}.field label{display:block;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:0 0 7px}
+select{width:100%;background:#fff;border:1px solid #d5dfd9;border-radius:8px;min-height:43px;padding:9px 32px 9px 12px;max-width:100%}
+.notice{border:1px solid #e7d6b5;border-left:3px solid #c99440;background:#fff8e9;color:#77501b;padding:10px 14px;border-radius:7px;margin:0 0 16px;font-size:13px}
+.viewer{background:var(--paper);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.viewer-head{padding:20px 24px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #edf1ed}
+.location{font-size:22px;letter-spacing:-.65px;line-height:1.25;margin:0 0 6px;font-weight:650;overflow-wrap:anywhere}
+.selection-sub{margin:0;color:var(--muted);font-size:13px}.selection-sub strong{color:var(--green-dark);font-weight:600}
+.actions{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.button{border:1px solid #d5dfd9;background:#fff;min-height:39px;border-radius:8px;padding:8px 13px;display:inline-flex;justify-content:center;align-items:center;gap:7px;text-decoration:none;font-size:12px;font-weight:650;color:var(--ink)}
+.button:hover{background:#f2f7f4}.button.primary{background:var(--green);border-color:var(--green);color:#fff}.button.primary:hover{background:var(--green-dark)}.button[aria-disabled=true]{opacity:.45;pointer-events:none}
+.button.icon{width:39px;padding:9px}.icon-svg{width:17px;height:17px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.stage{position:relative;background:#fff;display:flex;justify-content:center;align-items:center;height:clamp(320px,58vh,680px);min-height:290px;padding:14px 20px}
+.stage img{display:block;max-width:100%;max-height:100%;object-fit:contain;width:auto;height:auto}
+.stage-message{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:28px;background:#fff}
+.stage-message h3{font-size:19px;letter-spacing:-.4px;margin:18px 0 6px}.stage-message p{max-width:410px;color:var(--muted);margin:0 0 16px;font-size:13px}
+.empty-graphic{color:#87ad9d;background:#f0f6f1;padding:19px;border-radius:22px;width:78px;height:78px}.loader{width:30px;height:30px;border:3px solid #d9ece3;border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}.viewer-bottom{border-top:1px solid #e8eee9;background:#fcfdfb;padding:16px 24px 19px}
+.timeline-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 11px}.small-label{font-size:10px;color:var(--muted);font-weight:700;letter-spacing:1.2px;text-transform:uppercase}.count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.days{position:relative;display:flex;gap:8px;overflow-x:auto;padding:0 1px 6px;scrollbar-width:thin;scrollbar-color:#b4cdc0 transparent}
+.day{flex:1 0 86px;border:1px solid #dce6dd;background:#fff;border-radius:10px;padding:9px 10px;min-height:65px;text-align:left;transition:background .15s,border-color .15s}
+.day .weekday{font-size:10px;text-transform:uppercase;font-weight:700;letter-spacing:.7px;color:var(--muted);display:block}
+.day .date{font-size:15px;font-weight:650;display:block;margin-top:3px}.day[aria-pressed=true]{border-color:var(--green);background:var(--pale);box-shadow:inset 0 0 0 1px var(--green)}.day[aria-pressed=true] .weekday{color:var(--green-dark)}
+.controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:13px;flex-wrap:wrap}
+.transport{display:flex;gap:7px;align-items:center}.play{min-width:118px;font-size:13px}.play .symbol{width:15px;display:inline-block;font-size:12px;text-align:center}
+.preferences{display:flex;align-items:center;gap:17px;font-size:12px;color:var(--muted)}.speed{width:110px;min-height:36px;font-size:12px;padding:6px 25px 6px 9px}
+.repeat{display:flex;gap:6px;align-items:center;white-space:nowrap}.repeat input{accent-color:var(--green);width:15px;height:15px}
+.below{padding:14px 2px;display:flex;justify-content:space-between;gap:16px;color:var(--muted);font-size:11px}.below p{margin:0}.status{min-height:17px}
+.viewer:fullscreen{height:100vh;width:100vw;border-radius:0;border:0;display:flex;flex-direction:column}.viewer:fullscreen .stage{height:auto;flex:1;min-height:0}.viewer:fullscreen .stage img{position:absolute;max-height:calc(100% - 20px);max-width:calc(100% - 24px)}.viewer:fullscreen .viewer-head,.viewer:fullscreen .viewer-bottom{flex-shrink:0}
+.folder-note{font-size:11px;color:var(--muted)}
+@media(max-width:760px){.top{padding:19px 18px}.brand h1{font-size:18px}.brand p{font-size:9px;letter-spacing:1px}.brand-mark{width:36px;height:36px}.top-meta{flex-direction:column;gap:3px;align-items:flex-end}.source-tag{font-size:10px;padding:3px 8px}.updated{font-size:10px;max-width:115px}.page{padding:17px 12px}.intro{margin-bottom:14px;gap:10px}.intro p{font-size:12px}.text-button{font-size:12px}.filters{padding:14px;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:13px}.field:last-child{grid-column:1/-1}.field label{font-size:10px}select{font-size:12px}.viewer-head{padding:16px;align-items:flex-start}.location{font-size:18px}.actions{gap:5px}.actions .button{font-size:0;padding:9px;width:37px}.actions .icon-svg{width:17px}.selection-sub{font-size:11px}.stage{height:51vh;min-height:270px;padding:9px}.viewer-bottom{padding:13px 14px 16px}.day{flex-basis:74px;min-height:61px;padding:8px}.day .date{font-size:13px}.controls{gap:12px}.preferences{gap:12px}.play{min-width:100px}.below{font-size:10px;align-items:flex-start}.below .keyboard{display:none}}
+@media(prefers-reduced-motion:reduce){.day{transition:none}.loader{animation-duration:1.8s}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true"><svg class="icon-svg" style="width:27px;height:27px" viewBox="0 0 24 24"><path d="M3 17h14a4 4 0 0 0 .5-8A6 6 0 0 0 6 7.6 4.8 4.8 0 0 0 3 17Z"/><path d="m8 20-1 2m6-2-1 2m6-2-1 2"/></svg></div>
+    <div><h1>Previsão por região</h1><p>Mapas meteorológicos</p></div>
+  </div>
+  <div class="top-meta"><span class="source-tag">ECMWF</span><span class="updated" id="updated">Aguardando previsões</span></div>
+</header>
+<main class="page">
+  <div class="intro"><p>Escolha uma região e acompanhe a evolução dos próximos dias.</p><button class="text-button" id="open-folder"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5h6l2 2h10v13H3Z"/></svg>Abrir pasta</button></div>
+  <input id="folder-input" type="file" webkitdirectory multiple hidden aria-label="Pasta das previsões">
+  <div class="notice" id="notice" role="status" hidden></div>
+  <section class="filters" aria-label="Filtros de previsão">
+    <div class="field"><label for="state">Estado</label><select id="state" disabled><option>Brasil</option></select></div>
+    <div class="field"><label for="region">Mesorregião</label><select id="region" disabled><option>Brasil inteiro</option></select></div>
+    <div class="field"><label for="variable">Variável</label><select id="variable" disabled><option>Chuva do dia</option></select></div>
+  </section>
+  <section class="viewer" id="viewer" aria-label="Mapa e animação">
+    <div class="viewer-head">
+      <div><h2 class="location" id="region-title">Seus mapas, em um só lugar</h2><p class="selection-sub" id="selection-sub">Selecione as previsões para começar.</p></div>
+      <div class="actions">
+        <button class="button icon" id="fullscreen" title="Tela cheia" aria-label="Tela cheia"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button>
+        <a class="button" id="download" aria-disabled="true" title="Baixar mapa PNG" download><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>Baixar PNG</a>
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <img id="map-image" alt="" hidden>
+      <div class="stage-message" id="empty">
+        <svg class="empty-graphic" viewBox="0 0 40 40" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m3 10 11-4 12 4 11-4v25l-11 4-12-4-11 4Zm11-4v25m12-21v25"/><circle cx="23" cy="18" r="3"/></svg>
+        <h3 id="empty-title">Abra suas previsões</h3>
+        <p id="empty-description">Escolha a pasta de previsões para navegar pelos mapas e animar os dias.</p>
+        <button class="button primary" id="empty-open">Selecionar pasta</button>
+        <span class="folder-note" id="folder-note">Os arquivos são lidos no seu navegador.</span>
+      </div>
+      <div class="stage-message" id="loading" hidden><span class="loader" aria-hidden="true"></span><h3>Carregando mapa</h3><p>A imagem será exibida assim que estiver pronta.</p></div>
+    </div>
+    <div class="viewer-bottom">
+      <div class="timeline-head"><span class="small-label">Linha do tempo</span><span class="count" id="day-count">Nenhum dia disponível</span></div>
+      <div class="days" id="days" aria-label="Data da previsão"></div>
+      <div class="controls">
+        <div class="transport">
+          <button class="button icon" id="previous" disabled title="Dia anterior" aria-label="Dia anterior"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button>
+          <button class="button primary play" id="play" disabled aria-pressed="false"><span class="symbol" aria-hidden="true">▶</span><span id="play-label">Animar</span></button>
+          <button class="button icon" id="next" disabled title="Próximo dia" aria-label="Próximo dia"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button>
+        </div>
+        <div class="preferences">
+          <select class="speed" id="speed" aria-label="Velocidade da animação"><option value="1500">Lenta</option><option value="900" selected>Normal</option><option value="450">Rápida</option></select>
+          <label class="repeat"><input type="checkbox" id="repeat" checked>Repetir</label>
+        </div>
+      </div>
+    </div>
+  </section>
+  <div class="below"><p class="status" id="status" role="status" aria-live="polite">Fonte dos mapas: ECMWF.</p><p class="keyboard">← → para navegar · espaço para animar</p></div>
+</main>
+<script type="application/json" id="catalogo-dados">null</script>
+<script>
+'use strict';
+(() => {
+  const $ = id => document.getElementById(id);
+  const elements = {state:$('state'),region:$('region'),variable:$('variable'),image:$('map-image'),
+    days:$('days'),play:$('play'),download:$('download'),loading:$('loading'),empty:$('empty')};
+  const validProducts = new Set(['chuva_dia','chuva_acumulado','tmin','tmax','nuvem']);
+  const cache = new Map(), objectURLs = new Map();
+  let catalog=null, baseURL=new URL('./', location.href), localFiles=null;
+  let currentRegion=null, selectedVariable='chuva_dia', availableDays=[], dayIndex=0;
+  let playing=false, timer=null, renderVersion=0, sessionVersion=0, folderVersion=0, ready=false;
+  const monthNames=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const weekdays=['dom','seg','ter','qua','qui','sex','sáb'];
+  function todayISO(){
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    const part=t=>parts.find(p=>p.type===t).value;
+    return part('year')+'-'+part('month')+'-'+part('day');
+  }
+  function dateLabel(iso,withYear=false){
+    const p=iso.split('-'); return Number(p[2])+'/'+monthNames[Number(p[1])-1]+(withYear?'/'+p[0].slice(2):'');
+  }
+  function weekday(iso){return weekdays[new Date(iso+'T12:00:00Z').getUTCDay()];}
+  function safePath(path){
+    return typeof path==='string' && path.length<1500 && !/[:\\?#\u0000-\u001f]/.test(path) &&
+      path.split('/').every(p=>p && p!=='.' && p!=='..') && path.toLowerCase().endsWith('.png');
+  }
+  function validate(raw){
+    if(!raw || raw.versao!==1 || !Array.isArray(raw.regioes) || !Array.isArray(raw.dias) || !Array.isArray(raw.variaveis))
+      throw new Error('O catálogo de previsões não é compatível com este painel.');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(raw.data_base)) throw new Error('A data da previsão é inválida.');
+    const ids=new Set(), days=new Set();
+    for(const d of raw.dias){
+      if(!d || !/^[0-7]$/.test(String(d.id)) || !/^\d{4}-\d{2}-\d{2}$/.test(d.data) || days.has(String(d.id)))
+        throw new Error('As datas da previsão precisam ser verificadas.');
+      days.add(String(d.id)); d.id=String(d.id);
+    }
+    raw.dias.sort((a,b)=>a.data.localeCompare(b.data));
+    for(const r of raw.regioes){
+      if(!r || typeof r.id!=='string' || ids.has(r.id) || typeof r.nome!=='string' ||
+         !['brasil','estado','mesorregiao'].includes(r.tipo) || !r.mapas || typeof r.mapas!=='object')
+        throw new Error('A lista de regiões não é válida.');
+      ids.add(r.id);
+      for(const [product,frames] of Object.entries(r.mapas)){
+        if(!validProducts.has(product) || !frames || typeof frames!=='object') throw new Error('Variável inválida.');
+        for(const [day,path] of Object.entries(frames)){
+          if(!days.has(day) || !safePath(path)) throw new Error('Um mapa tem um caminho inválido.');
+        }
+      }
+    }
+    raw.variaveis=raw.variaveis.filter(v=>v && validProducts.has(v.id) && typeof v.nome==='string');
+    if(!raw.regioes.length || !raw.dias.length || !raw.variaveis.length) throw new Error('Ainda não há mapas disponíveis.');
+    return raw;
+  }
+  function option(value,label){const o=document.createElement('option');o.value=value;o.textContent=label;return o;}
+  function announce(text){$('status').textContent=text;}
+  function showEmpty(title,description,allowFolder=true){
+    elements.image.hidden=true; elements.loading.hidden=true; elements.empty.hidden=false;
+    $('empty-title').textContent=title; $('empty-description').textContent=description;
+    $('empty-open').hidden=!allowFolder; $('folder-note').hidden=!allowFolder;
+  }
+  function stop(){
+    playing=false; clearTimeout(timer);timer=null; elements.play.setAttribute('aria-pressed','false');
+    $('play-label').textContent='Animar'; elements.play.querySelector('.symbol').textContent='▶';
+  }
+  function clearResources(){
+    stop(); renderVersion++;sessionVersion++;cache.clear();ready=false;
+    elements.image.removeAttribute('src');
+    for(const u of objectURLs.values()) URL.revokeObjectURL(u);
+    objectURLs.clear();
+  }
+  function selectedDate(){return availableDays[dayIndex]?.data || todayISO();}
+  function configureRegions(uf,preferred){
+    elements.region.replaceChildren();
+    const list=catalog.regioes.filter(r=>uf==='BR'?r.tipo==='brasil':r.uf===uf)
+      .sort((a,b)=>(a.tipo==='estado'?-1:b.tipo==='estado'?1:a.nome.localeCompare(b.nome,'pt-BR')));
+    for(const r of list) elements.region.add(option(r.id,r.tipo==='brasil'?'Brasil inteiro':r.tipo==='estado'?'Estado inteiro':r.nome));
+    currentRegion=list.find(r=>r.id===preferred)||list[0];
+    if(!currentRegion) throw new Error('Esta área ainda não tem mapas disponíveis.');
+    elements.region.value=currentRegion.id;elements.region.disabled=list.length<2;
+  }
+  function configureVariables(preferred){
+    const list=catalog.variaveis.filter(v=>Object.keys(currentRegion.mapas[v.id]||{}).length);
+    elements.variable.replaceChildren();
+    for(const v of list) elements.variable.add(option(v.id,v.nome+' ('+v.unidade+')'));
+    selectedVariable=list.some(v=>v.id===preferred)?preferred:list[0]?.id;
+    elements.variable.value=selectedVariable||'';elements.variable.disabled=list.length<2;
+  }
+  function configureDays(preferredDate){
+    const frames=currentRegion.mapas[selectedVariable]||{};
+    availableDays=catalog.dias.filter(d=>frames[d.id]);
+    dayIndex=Math.max(0,availableDays.findIndex(d=>d.data===preferredDate));
+    elements.days.replaceChildren();
+    for(const [i,d] of availableDays.entries()){
+      const b=document.createElement('button');b.className='day';b.type='button';
+      const w=document.createElement('span');w.className='weekday';w.textContent=d.data===todayISO()?'Hoje · '+weekday(d.data):weekday(d.data);
+      const text=document.createElement('span');text.className='date';text.textContent=dateLabel(d.data);
+      b.append(w,text);b.setAttribute('aria-label',d.rotulo||weekday(d.data)+' '+dateLabel(d.data,true));
+      b.addEventListener('click',()=>{stop();dayIndex=i;render();});
+      elements.days.append(b);
+    }
+    updateControls();
+  }
+  function updateControls(){
+    $('previous').disabled=dayIndex<=0 || !availableDays.length;
+    $('next').disabled=dayIndex>=availableDays.length-1 || !availableDays.length;
+    elements.play.disabled=availableDays.length<2;
+    $('day-count').textContent=availableDays.length?'Dia '+(dayIndex+1)+' de '+availableDays.length:'Nenhum dia disponível';
+    [...elements.days.children].forEach((b,i)=>b.setAttribute('aria-pressed',String(i===dayIndex)));
+    elements.download.setAttribute('aria-disabled',String(!ready));
+    if(!ready) elements.download.removeAttribute('href');
+  }
+  function pathFor(index){return currentRegion.mapas[selectedVariable][availableDays[index].id];}
+  function urlFor(path){
+    if(localFiles){
+      const file=localFiles.get(path.normalize('NFC'));
+      if(!file) throw new Error('Esta imagem não está na pasta selecionada.');
+      if(!objectURLs.has(path)) objectURLs.set(path,URL.createObjectURL(file));
+      return objectURLs.get(path);
+    }
+    const url=new URL(path.split('/').map(encodeURIComponent).join('/'),baseURL);
+    if(url.protocol!=='file:') url.searchParams.set('v',catalog.gerado_em||catalog.data_base);
+    return url.href;
+  }
+  function loadImage(path){
+    if(cache.has(path)){const entry=cache.get(path);cache.delete(path);cache.set(path,entry);return entry;}
+    const session=sessionVersion;
+    const promise=new Promise((resolve,reject)=>{
+      let url;try{url=urlFor(path);}catch(e){reject(e);return;}
+      const img=new Image();let settled=false;
+      const finish=(error)=>{
+        if(settled)return;settled=true;clearTimeout(timeout);img.onload=null;img.onerror=null;
+        if(error)reject(error);else resolve({url,width:img.naturalWidth,height:img.naturalHeight});
+      };
+      const timeout=setTimeout(()=>finish(new Error('A imagem demorou a carregar. Tente novamente.')),20000);
+      img.onload=()=>img.naturalWidth?finish():finish(new Error('O arquivo de imagem está vazio.'));
+      img.onerror=()=>finish(new Error('Não foi possível abrir este mapa. Confira a pasta de previsões.'));
+      img.src=url;
+    });
+    cache.set(path,promise);
+    promise.catch(()=>{if(session===sessionVersion && cache.get(path)===promise)cache.delete(path);});
+    while(cache.size>12)cache.delete(cache.keys().next().value);
+    return promise;
+  }
+  function syncURL(){
+    if(location.protocol==='file:' || !currentRegion || !availableDays.length)return;
+    try{
+      const q=new URL(location.href);q.searchParams.set('regiao',currentRegion.id);
+      q.searchParams.set('variavel',selectedVariable);q.searchParams.set('data',selectedDate());
+      history.replaceState(null,'',q);
+    }catch{}
+  }
+  async function render(){
+    const version=++renderVersion;ready=false;updateControls();
+    if(!availableDays.length){showEmpty('Sem mapas para esta seleção','Escolha outra região ou variável.',false);return false;}
+    const d=availableDays[dayIndex], variable=catalog.variaveis.find(v=>v.id===selectedVariable), path=pathFor(dayIndex);
+    $('region-title').textContent=currentRegion.rotulo||currentRegion.nome;
+    $('selection-sub').replaceChildren();
+    const strong=document.createElement('strong');strong.textContent=variable.nome+' ('+variable.unidade+')';
+    $('selection-sub').append(strong,document.createTextNode(' · '+(selectedVariable==='chuva_acumulado'?d.acumulado:d.rotulo)));
+    elements.image.hidden=true;elements.empty.hidden=true;elements.loading.hidden=false;
+    const dayButton=elements.days.children[dayIndex];
+    if(dayButton){
+      const left=dayButton.offsetLeft, right=left+dayButton.offsetWidth;
+      if(left<elements.days.scrollLeft)elements.days.scrollLeft=left;
+      else if(right>elements.days.scrollLeft+elements.days.clientWidth)
+        elements.days.scrollLeft=right-elements.days.clientWidth;
+    }
+    syncURL();
+    try{
+      const image=await loadImage(path);
+      if(version!==renderVersion)return false;
+      elements.image.src=image.url;elements.image.alt=(currentRegion.rotulo||currentRegion.nome)+' — '+variable.nome+' — '+d.rotulo;
+      elements.image.hidden=false;elements.loading.hidden=true;ready=true;
+      elements.download.href=image.url;elements.download.download=path.split('/').pop();updateControls();
+      announce(playing?'Animação em andamento.':catalog.regioes.length+' áreas disponíveis · fonte ECMWF.');
+      // Antecipar só a próxima imagem evita carregar milhares de arquivos.
+      if(availableDays.length>1)loadImage(pathFor((dayIndex+1)%availableDays.length)).catch(()=>{});
+      return true;
+    }catch(e){
+      if(version!==renderVersion)return false;
+      stop();showEmpty('Mapa indisponível',e.message,false);announce('Animação pausada. Escolha outro dia ou atualize as previsões.');
+      return false;
+    }
+  }
+  function scheduleFrame(){
+    clearTimeout(timer);
+    if(!playing)return;
+    timer=setTimeout(async()=>{
+      if(!playing)return;
+      if(dayIndex===availableDays.length-1){
+        if(!$('repeat').checked){stop();announce('Animação concluída.');return;}
+        dayIndex=0;
+      }else dayIndex++;
+      const ok=await render();if(ok && playing)scheduleFrame();
+    },Number($('speed').value));
+  }
+  async function togglePlay(){
+    if(playing){stop();announce('Animação pausada.');return;}
+    if(availableDays.length<2)return;
+    playing=true;elements.play.setAttribute('aria-pressed','true');
+    $('play-label').textContent='Pausar';elements.play.querySelector('.symbol').textContent='Ⅱ';
+    if(dayIndex===availableDays.length-1 && !$('repeat').checked){dayIndex=0;ready=false;}
+    const ok=ready || await render();if(ok && playing)scheduleFrame();
+  }
+  function move(delta){if(!catalog)return;stop();dayIndex=Math.max(0,Math.min(availableDays.length-1,dayIndex+delta));render();}
+  async function activate(raw,newBase,files){
+    const checked=validate(raw);clearResources();catalog=checked;baseURL=newBase;localFiles=files||null;
+    const q=new URLSearchParams(location.search), requested=q.get('regiao');
+    const initial=catalog.regioes.find(r=>r.id===requested)||catalog.regioes.find(r=>r.tipo==='brasil')||catalog.regioes[0];
+    const states=new Map();for(const r of catalog.regioes)if(r.uf)states.set(r.uf,r.estado||r.uf);
+    elements.state.replaceChildren();
+    if(catalog.regioes.some(r=>r.tipo==='brasil'))elements.state.add(option('BR','Brasil inteiro'));
+    for(const [uf,name] of [...states].sort((a,b)=>a[1].localeCompare(b[1],'pt-BR')))elements.state.add(option(uf,name+' — '+uf));
+    elements.state.value=initial.tipo==='brasil'?'BR':initial.uf;elements.state.disabled=elements.state.options.length<2;
+    configureRegions(elements.state.value,initial.id);configureVariables(q.get('variavel')||'chuva_dia');
+    configureDays(q.get('data')||todayISO());
+    const updated=String(catalog.gerado_em||catalog.data_base).slice(0,10);
+    $('updated').textContent='Atualização: '+dateLabel(/^\d{4}-\d{2}-\d{2}$/.test(updated)?updated:catalog.data_base,true);
+    const notices=[];
+    if(catalog.demonstracao)notices.push('Demonstração com dados simulados. Estas imagens não são uma previsão real.');
+    if(catalog.data_base<todayISO())notices.push('Previsão com data-base '+dateLabel(catalog.data_base,true)+'. Confira as datas disponíveis.');
+    if(catalog.mapas_ausentes>0)notices.push('Alguns mapas não estão disponíveis. A seleção mostra os dias encontrados.');
+    $('notice').hidden=!notices.length;$('notice').textContent=notices.join(' ');
+    await render();
+  }
+  elements.state.addEventListener('change',()=>{stop();const date=selectedDate();configureRegions(elements.state.value);configureVariables(selectedVariable);configureDays(date);render();});
+  elements.region.addEventListener('change',()=>{stop();const date=selectedDate();currentRegion=catalog.regioes.find(r=>r.id===elements.region.value);configureVariables(selectedVariable);configureDays(date);render();});
+  elements.variable.addEventListener('change',()=>{stop();const date=selectedDate();selectedVariable=elements.variable.value;configureDays(date);render();});
+  $('previous').addEventListener('click',()=>move(-1));$('next').addEventListener('click',()=>move(1));
+  elements.play.addEventListener('click',togglePlay);$('speed').addEventListener('change',()=>{if(playing)scheduleFrame();});
+  elements.download.addEventListener('click',e=>{if(!ready)e.preventDefault();});
+  $('fullscreen').addEventListener('click',async()=>{
+    try{if(document.fullscreenElement)await document.exitFullscreen();else await $('viewer').requestFullscreen();}
+    catch{announce('Tela cheia não está disponível neste navegador.');}
+  });
+  document.addEventListener('fullscreenchange',()=>{$('fullscreen').setAttribute('aria-label',document.fullscreenElement?'Sair da tela cheia':'Tela cheia');});
+  document.addEventListener('keydown',e=>{
+    if(!catalog || e.ctrlKey || e.altKey || e.metaKey || /INPUT|SELECT|TEXTAREA|BUTTON|A/.test(e.target.tagName))return;
+    if(e.key==='ArrowLeft'){e.preventDefault();move(-1);}if(e.key==='ArrowRight'){e.preventDefault();move(1);}
+    if(e.code==='Space'){e.preventDefault();togglePlay();}
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+  const openFolder=()=>{$('folder-input').value='';$('folder-input').click();};
+  $('open-folder').addEventListener('click',openFolder);$('empty-open').addEventListener('click',openFolder);
+  $('folder-input').addEventListener('change',async e=>{
+    const version=++folderVersion;stop();
+    try{
+      const list=Array.from(e.target.files||[]);if(!list.length)return;
+      const manifests=list.filter(f=>f.name==='mapas.json').sort((a,b)=>a.webkitRelativePath.length-b.webkitRelativePath.length);
+      if(manifests.length!==1)throw new Error('Escolha uma única pasta de previsões da versão atual do projeto.');
+      const manifest=manifests[0], prefix=manifest.webkitRelativePath.slice(0,-manifest.name.length);
+      const raw=JSON.parse(await manifest.text());if(version!==folderVersion)return;
+      const files=new Map();
+      for(const f of list)if(f.webkitRelativePath.startsWith(prefix)){
+        const path=f.webkitRelativePath.slice(prefix.length).normalize('NFC');if(safePath(path))files.set(path,f);
+      }
+      await activate(raw,new URL('./',location.href),files);
+    }catch(e){announce(e.message);if(!catalog)showEmpty('Não foi possível abrir a pasta',e.message);}
+  });
+  async function start(){
+    try{
+      const embedded=JSON.parse($('catalogo-dados').textContent);
+      if(embedded){await activate(embedded,new URL('./',location.href),null);return;}
+      if(location.protocol==='file:')return;
+      for(const path of ['previsao_regioes/mapas.json','mapas.json']){
+        try{
+          const url=new URL(path,location.href), controller=new AbortController();
+          const timeout=setTimeout(()=>controller.abort(),8000);
+          let response;try{response=await fetch(url,{cache:'no-store',signal:controller.signal});}finally{clearTimeout(timeout);}
+          if(!response.ok)continue;
+          const raw=await response.json();await activate(raw,new URL('./',response.url),null);return;
+        }catch{}
+      }
+      announce('Selecione uma pasta de previsões ou aguarde a primeira geração do projeto.');
+    }catch(e){showEmpty('Não foi possível abrir as previsões',e.message);announce(e.message);}
+  }
+  window.addEventListener('beforeunload',()=>{for(const url of objectURLs.values())URL.revokeObjectURL(url);});
+  start();
+})();
+</script>
+</body>
+</html>

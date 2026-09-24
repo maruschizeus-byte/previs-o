@@ -4,6 +4,7 @@
     "logo": "logoamaggi.png",
     "logo_posicao": "inferior-esquerda",
     "mesorregioes": true,
+    "mapas_mesorregioes": true,
     "pontos": [
       {"nome": "LEO", "lat": -17.036030, "lon": -54.178010},
       {"nome": "PRI", "lat": -15.255833, "lon": -54.139167},
@@ -16,7 +17,8 @@
       {"nome": "PRP", "lat": -13.822448, "lon": -57.208794},
       {"nome": "ITA", "lat": -14.235650, "lon": -57.995580},
       {"nome": "AGQ", "lat": -13.837257, "lon": -58.885565},
-      {"nome": "TUC", "lat": -13.549170, "lon": -58.926315}
+      {"nome": "TUC", "lat": -13.549170, "lon": -58.926315},
+      {"nome": "TGO", "lat": -12.940728, "lon": -52.396250}
     ]
   }
 }

@@ -455,8 +455,9 @@ def preparar_pastas(alvos, saida, estados):
             "arquivo_kml": regiao["arquivo"] if regiao else None,
             "pasta": sub.replace(os.sep, "/"),
         }
-        if regiao and regiao.get("pontos"):
-            registro["pontos"] = regiao["pontos"]
+        if regiao and regiao.get("tipo") == "grupo":
+            registro["grupo"] = regiao.get("grupo") or regiao["nome"]
+            registro["pontos"] = regiao.get("pontos") or []
         # O Git não versiona pastas vazias. Este arquivo identifica a região;
         # sua presença não significa que os mapas já foram atualizados.
         with open(os.path.join(pasta, "regiao.json"), "w", encoding="utf-8") as fp:
@@ -650,29 +651,49 @@ def ler_grupos(caminho):
             raise ValueError(f"grupo {nome}: logo_posicao deve ser uma de {', '.join(POSICOES_LOGO)}")
         grupos[nome] = {"nome": nome, "uf": uf, "pontos": pontos, "logo": logo, "logo_pos": logo_pos,
                         "mesorregioes": bool(cfg.get("mesorregioes", True)),
+                        # além do mapa do estado, um mapa do grupo para cada mesorregião da UF
+                        "mapas_mesorregioes": bool(cfg.get("mapas_mesorregioes", False)),
                         # nomes escritos dentro das mesorregiões: desligado por padrão
                         "nomes_mesorregioes": bool(cfg.get("nomes_mesorregioes", False))}
     return grupos
 
 
-def remover_grupos_orfaos(saida, grupos):
-    """Apaga pastas de grupo (regiao.json com tipo "grupo") que não estão mais no grupos.json."""
+def _ler_regiao_json(pasta):
+    try:
+        with open(os.path.join(pasta, "regiao.json"), encoding="utf-8") as fp:
+            info = json.load(fp)
+        return info if isinstance(info, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def remover_grupos_orfaos(saida, grupos, gerados=()):
+    """Apaga pastas de grupo que não estão mais no grupos.json e, nos grupos
+    gerados agora, os mapas por mesorregião que deixaram de ser gerados."""
     import shutil
     validos = {k.casefold() for k in grupos}
+    gerados = {os.path.normpath(g) for g in gerados}
     try:
         pastas = sorted(os.listdir(saida))
     except OSError:
         return
     for nome in pastas:
         pasta = os.path.join(saida, nome)
-        try:
-            with open(os.path.join(pasta, "regiao.json"), encoding="utf-8") as fp:
-                info = json.load(fp)
-        except (OSError, ValueError):
+        info = _ler_regiao_json(pasta)
+        if not info or info.get("tipo") != "grupo":
             continue
-        if isinstance(info, dict) and info.get("tipo") == "grupo" and str(info.get("nome", "")).casefold() not in validos:
+        if str(info.get("nome", "")).casefold() not in validos:
             shutil.rmtree(pasta)
             print(f"Removida a pasta {nome}/: o grupo {info.get('nome')} não está mais em grupos.json.")
+            continue
+        if os.path.normpath(nome) not in gerados:
+            continue  # grupo não gerado nesta execução: não mexe
+        for sub in sorted(os.listdir(pasta)):
+            caminho = os.path.join(pasta, sub)
+            sub_info = _ler_regiao_json(caminho) if os.path.isdir(caminho) else None
+            if sub_info and sub_info.get("tipo") == "grupo" and os.path.normpath(os.path.join(nome, sub)) not in gerados:
+                shutil.rmtree(caminho)
+                print(f"Removida a pasta {nome}/{sub}/: mapa por mesorregião que não é mais gerado.")
 
 
 def _area_anel(anel):
@@ -1204,7 +1225,7 @@ def _rotular_grupo(ax, renderer, grupo, obstaculos=()):
     ocupado, disp = list(obstaculos), []
     for p in grupo["pontos"]:
         ax.plot(p["lon"], p["lat"], linestyle="none", marker="^", markersize=9,
-                markerfacecolor="#111111", markeredgecolor="white", markeredgewidth=1.2, zorder=8)
+                markerfacecolor="#111111", markeredgecolor="white", markeredgewidth=1.2, zorder=11)
         x, y = ax.transData.transform((p["lon"], p["lat"]))
         disp.append((x, y))
         ocupado.append(Bbox.from_extents(x - 9, y - 8, x + 9, y + 10))
@@ -1225,7 +1246,7 @@ def _rotular_grupo(ax, renderer, grupo, obstaculos=()):
         p, melhor = grupo["pontos"][i], None
         for dx, dy, ha, va in candidatos:
             t = ax.annotate(p["nome"], (p["lon"], p["lat"]), xytext=(dx, dy), textcoords="offset points",
-                            ha=ha, va=va, fontsize=11, fontweight="bold", color="#111111", zorder=9)
+                            ha=ha, va=va, fontsize=11, fontweight="bold", color="#111111", zorder=12)
             t.set_path_effects(halo)
             bb = t.get_window_extent(renderer).padded(2)
             fora = bb.width * bb.height - _sobreposicao(bb, eixo)
@@ -1292,7 +1313,7 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
                 xy = np.array(poly)
                 ax.plot(xy[:, 0], xy[:, 1], color="black", linewidth=0.5, alpha=0.55)
     # Grupo de pontos (ex.: AMAGGI): mesorregiões do estado em tracejado.
-    grupo = regiao if regiao is not None and regiao.get("pontos") else None
+    grupo = regiao if regiao is not None and regiao.get("tipo") == "grupo" else None
     for r in (grupo or {}).get("contornos") or []:
         for poly in r["poligonos"]:
             xy = np.array(poly)
@@ -1758,8 +1779,9 @@ def main():
         estado = next((r for r in fundo_regioes if uf_sigla(r, fundo_regioes) == uf), None)
         if estado is None:
             sys.exit(f"ERRO: grupo {g['nome']}: o estado {uf} não está no KML de estados.")
-        contornos = [r for r in mesos if uf_sigla(r, fundo_regioes) == uf] if g["mesorregioes"] else []
-        if g["mesorregioes"] and not contornos:
+        mesos_uf = [r for r in mesos if uf_sigla(r, fundo_regioes) == uf]
+        contornos = mesos_uf if g["mesorregioes"] else []
+        if (g["mesorregioes"] or g["mapas_mesorregioes"]) and not mesos_uf:
             print(f"  AVISO: grupo {g['nome']}: nenhuma mesorregião de {uf} no KML; sai só o contorno do estado.")
         evitar = [(p["lon"], p["lat"]) for p in g["pontos"]]
         rotulos = []
@@ -1780,7 +1802,7 @@ def main():
             else:
                 print(f"  AVISO: logo do grupo {g['nome']} não encontrada ({g['logo']}); seguindo sem ela. "
                       "Coloque o arquivo na raiz do repositório.")
-        reg = dict(estado, nome=g["nome"], tipo="grupo", campos=dict(estado["campos"], sigla=uf),
+        reg = dict(estado, nome=g["nome"], tipo="grupo", grupo=g["nome"], campos=dict(estado["campos"], sigla=uf),
                    logo_grupo=logo_grupo,
                    pontos=g["pontos"], contornos=contornos, rotulos_contornos=rotulos,
                    nome_mapa=f"{g['nome']} — {UF_NOMES[uf]}")
@@ -1795,6 +1817,20 @@ def main():
         alvos.append((_pasta_segura(g["nome"]), reg, ext, []))
         print(f"Alvo: grupo {g['nome']} -> {_pasta_segura(g['nome'])}/  {UF_NOMES[uf]}, "
               f"{len(g['pontos'])} pontos, {len(contornos)} mesorregiões")
+        if g["mapas_mesorregioes"]:
+            for meso in mesos_uf:
+                nome_meso = re.sub(rf"\s*(?:[-–—/]\s*{uf}|\({uf}\))$", "", " ".join(meso["nome"].split()), flags=re.I)
+                lo0, la0, lo1, la1 = bbox_regiao(meso)
+                ext_m = (lo0 - m, lo1 + m, la0 - m, la1 + m)
+                # só os pontos do grupo que ficam dentro desta mesorregião
+                pontos_m = [p for p in g["pontos"] if ponto_na_regiao(p["lon"], p["lat"], meso)]
+                titulo = f"{g['nome']} — {nome_meso}"
+                reg_m = dict(meso, nome=titulo, tipo="grupo", grupo=g["nome"], campos=dict(meso["campos"], sigla=uf),
+                             pontos=pontos_m, contornos=mesos_uf, rotulos_contornos=[], nome_mapa=titulo,
+                             logo_grupo=logo_grupo)
+                sub_m = os.path.join(_pasta_segura(g["nome"]), _pasta_segura(nome_meso))
+                alvos.append((sub_m, reg_m, ext_m, []))
+                print(f"Alvo: grupo {g['nome']} -> {sub_m}  pontos: {', '.join(p['nome'] for p in pontos_m) or 'nenhum'}")
 
     if not alvos:
         sys.exit("Nenhum alvo válido — nada a gerar.")
@@ -1888,7 +1924,7 @@ def main():
                     print(f"    {total}/{total_esperado} figuras | {seg:.0f}s | ~{restam:.0f}s restantes")
         print(f"  dia {dias}d concluído")
     if grupos:
-        remover_grupos_orfaos(args.saida, grupos)
+        remover_grupos_orfaos(args.saida, grupos, {sub for sub, r, _, _ in alvos if r and r.get("tipo") == "grupo"})
     # Catálogo primeiro: aponta só para os mapas novos, que já existem.
     gerado_em = dt.datetime.now(BRASILIA).isoformat(timespec="seconds")
     escrever_catalogo(args.saida, alvos, fundo_regioes, hoje, dias_dados,

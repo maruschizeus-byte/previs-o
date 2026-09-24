@@ -67,6 +67,9 @@ select{width:100%;background:#fff;border:1px solid #d0dcd5;border-radius:8px;min
 .segmentos input:disabled+span{opacity:.4;text-decoration:line-through}
 .nota-fmt{font-size:12.5px;color:var(--muted);margin:6px 0 0;min-height:0}
 .nota-fmt:empty{display:none}
+.acum{margin:-2px 0 14px;align-items:flex-start}
+.acum input{margin-top:2px}
+.acum small{display:block;color:var(--muted);font-size:12.5px}
 .lote{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
 .lote summary{cursor:pointer;font-weight:650;padding:4px 0;list-style-position:inside}
 .lote fieldset{border:0;padding:0;margin:12px 0 0}
@@ -157,13 +160,15 @@ select{width:100%;background:#fff;border:1px solid #d0dcd5;border-radius:8px;min
       <div class="duas">
         <div class="campo"><label for="sel-tempo">Tempo por dia</label>
           <select id="sel-tempo"><option value="0.4">0,4 s</option><option value="0.6">0,6 s</option><option value="0.8">0,8 s</option><option value="1" selected>1 s</option><option value="1.5">1,5 s</option><option value="2">2 s</option><option value="3">3 s</option></select></div>
-        <div class="campo"><label for="sel-pausa">Pausa no último dia</label>
+        <div class="campo"><label for="sel-pausa">Pausa no fim</label>
           <select id="sel-pausa"><option value="0">Sem pausa</option><option value="1">+1 s</option><option value="2" selected>+2 s</option><option value="3">+3 s</option><option value="5">+5 s</option></select></div>
         <div class="campo"><label for="sel-largura">Largura</label>
           <select id="sel-largura"><option value="600">600 px</option><option value="800" selected>800 px</option><option value="1000">1000 px</option><option value="1200">1200 px</option><option value="0">Original</option></select></div>
         <div class="campo" id="campo-rep"><label for="sel-rep">Repetição</label>
           <select id="sel-rep"><option value="sempre" selected>Sem parar</option><option value="uma">Uma vez</option></select></div>
       </div>
+      <label class="opc acum" id="linha-acum" hidden><input type="checkbox" id="chk-acum" checked>
+        <span>Terminar com a chuva acumulada<small id="nota-acum"></small></span></label>
       <div class="acoes">
         <button class="btn" id="criar" type="button">Criar GIF</button>
         <a class="btn outline" id="baixar" aria-disabled="true" role="button">Baixar GIF</a>
@@ -182,7 +187,7 @@ select{width:100%;background:#fff;border:1px solid #d0dcd5;border-radius:8px;min
           <legend>Variáveis</legend>
           <div id="lote-vars"></div>
         </fieldset>
-        <p class="nota">Usa o formato, o tempo, a pausa, a largura e os dias marcados na fita. Sai um .zip com uma pasta por estado e mesorregião.</p>
+        <p class="nota">Usa o formato, o tempo, a pausa, a largura, os dias marcados na fita e o acumulado no fim. Sai um .zip com uma pasta por estado e mesorregião.</p>
         <button class="btn" id="criar-lote" type="button">Criar .zip</button>
         <div class="progresso" id="progresso" hidden>
           <div class="barra"><span id="barra"></span></div>
@@ -249,7 +254,7 @@ const fmt = n => n.toLocaleString('pt-BR');
 const est = {
   regioes: [], bases: [], base: null, totalMapas: 0,
   regiao: null, tipo: null, quadros: null, chaveQuadros: null,
-  diasFora: new Set(), resultadoURL: null, loteURL: null,
+  diasFora: new Set(), resultadoURL: null, loteURL: null, acum: null, acumCache: new Map(),
   tocando: !matchMedia('(prefers-reduced-motion: reduce)').matches,
   timer: null, frame: 0, versao: 0, ocupado: false, cancelar: false,
 };
@@ -296,7 +301,8 @@ async function nomearRegioes(regioes, infos) {
     if (/^brasil$/i.test(r.alvo) || (info && info.tipo === 'brasil') || (!r.alvo && /^brasil$/i.test(segs[segs.length - 1] || ''))) {
       Object.assign(r, {tipo: 'brasil', uf: null, nome: 'Brasil'});
     } else if (info && info.tipo === 'grupo' && info.nome) {  // grupo de pontos (ex.: AMAGGI)
-      Object.assign(r, {tipo: 'grupo', uf: UF_NOMES[info.uf] ? info.uf : null, nome: String(info.nome).replace(/\s+/g, ' ').trim()});
+      const nome = String(info.nome).replace(/\s+/g, ' ').trim();  // mapa por mesorregião: "AMAGGI — NORTE ..."
+      Object.assign(r, {tipo: 'grupo', uf: UF_NOMES[info.uf] ? info.uf : null, nome, subgrupo: !!(info.grupo && info.grupo !== nome)});
     } else {
       const uf = [info && info.uf, alvoUF, segUF].find(u => u && UF_NOMES[u]) || null;
       const resto = r.alvo.replace(/^[A-Z]{2}_/, '');
@@ -306,7 +312,7 @@ async function nomearRegioes(regioes, infos) {
         (segs.length ? segs[segs.length - 1] : resto.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()));
       Object.assign(r, {tipo, uf, nome: String(nome).replace(/\s+/g, ' ').trim()});
     }
-    r.rotulo = r.tipo === 'brasil' ? 'Brasil' : r.tipo === 'grupo' ? r.nome + (r.uf ? ' — ' + UF_NOMES[r.uf] : '') : r.tipo === 'estado' ? r.nome + (r.uf ? ' — estado inteiro' : '') : r.nome + (r.uf ? ' — ' + r.uf : '');
+    r.rotulo = r.tipo === 'brasil' ? 'Brasil' : r.tipo === 'grupo' ? (r.subgrupo ? r.nome : r.nome + (r.uf ? ' — ' + UF_NOMES[r.uf] : '')) : r.tipo === 'estado' ? r.nome + (r.uf ? ' — estado inteiro' : '') : r.nome + (r.uf ? ' — ' + r.uf : '');
     r.prefixo = r.alvo || slug(r.rel || r.nome) || 'area';
   }
   return regioes;
@@ -465,7 +471,7 @@ function montarAreas(preferida) {
   const uf = $('sel-estado').value, lista = areasDoEstado(uf), sel = $('sel-area');
   sel.replaceChildren();
   for (const r of lista) sel.add(opcao(r.chave, r.tipo === 'brasil' ? 'Brasil inteiro' : r.tipo === 'estado' ? 'Estado inteiro'
-    : r.tipo === 'grupo' ? r.nome + (r.uf ? ' (' + UF_NOMES[r.uf] + ')' : '') : r.nome));
+    : r.tipo === 'grupo' ? (r.subgrupo ? r.nome : r.nome + (r.uf ? ' (' + UF_NOMES[r.uf] + ')' : '')) : r.nome));
   est.regiao = lista.find(r => r.chave === preferida) || lista[0] || null;
   if (est.regiao) sel.value = est.regiao.chave;
   sel.disabled = lista.length < 2;
@@ -503,8 +509,40 @@ function quadrosDaSerie(r, tipo) {
 
 function liberarQuadros() {
   if (est.quadros) for (const q of est.quadros) q.bmp && q.bmp.close && q.bmp.close();
+  for (const b of est.acumCache.values()) b.close && b.close();
+  est.acumCache.clear(); est.acum = null;
   est.quadros = null; est.chaveQuadros = null;
 }
+
+// Mapa de chuva acumulada até o último dia da animação (último quadro).
+function entradaAcumulado(r, tipo, dias) {
+  if (!r || tipo === 'chuva_acumulado' || !dias.length) return null;
+  const porDia = r.series.get('chuva_acumulado') && r.series.get('chuva_acumulado').get(est.base);
+  if (!porDia) return null;
+  const ultimo = Math.max(...dias), dia = [...porDia.keys()].filter(d => d <= ultimo).sort((a, b) => b - a)[0];
+  return dia === undefined ? null : {dia, ent: porDia.get(dia)};
+}
+
+async function prepararAcumulado() {
+  const versao = est.versao;
+  const alvo = est.quadros ? entradaAcumulado(est.regiao, est.tipo, incluidos().map(q => q.dia)) : null;
+  let acum = null;
+  if (alvo) {
+    const chave = est.chaveQuadros + '|' + alvo.dia;
+    let bmp = est.acumCache.get(chave);
+    if (!bmp) {
+      try { bmp = await createImageBitmap(await alvo.ent.obter()); } catch { bmp = null; }
+      if (versao !== est.versao) { bmp && bmp.close && bmp.close(); return; }
+      if (bmp) est.acumCache.set(chave, bmp);
+    }
+    if (bmp) acum = {dia: alvo.dia, bmp, acumulado: true};
+  }
+  est.acum = acum;
+  $('linha-acum').hidden = !acum;
+  $('nota-acum').textContent = acum && est.base !== SEM_DATA
+    ? `Último quadro: ${rotuloData(est.base)} a ${rotuloData(somaDias(est.base, acum.dia))}` : '';
+}
+const usarAcum = () => !!(est.acum && $('chk-acum').checked);
 
 async function decodificar(lista) {
   const saida = [];
@@ -522,6 +560,8 @@ async function decodificar(lista) {
 
 const dataDoDia = dia => est.base === SEM_DATA ? null : somaDias(est.base, dia);
 const incluidos = () => (est.quadros || []).filter(q => !est.diasFora.has(q.dia));
+const sequencia = () => { const l = incluidos(); return l.length && usarAcum() ? [...l, est.acum] : l; };
+const chaveQuadro = q => q.acumulado ? 'acum' : String(q.dia);
 
 function medidas(quadros) {
   const larg = Number($('sel-largura').value);
@@ -554,18 +594,36 @@ async function trocarSerie() {
       est.quadros = q; est.chaveQuadros = chave;
     } catch (e) { if (versao === est.versao) { mostrarAviso(e.message); status(e.message, true); } return; }
   }
+  await prepararAcumulado();
+  if (versao !== est.versao) return;
   montarFita(); atualizarBotoes(); est.frame = 0; mostrarPrevia();
+}
+
+function miniatura(bmp) {
+  const c = document.createElement('canvas'); c.width = 196; c.height = 124;
+  const ctx = c.getContext('2d'), esc = Math.min(c.width / bmp.width, c.height / bmp.height);
+  const w = bmp.width * esc, h = bmp.height * esc;
+  ctx.fillStyle = '#fff'; ctx.fillRect((c.width - w) / 2, (c.height - h) / 2, w, h);
+  ctx.imageSmoothingQuality = 'high'; ctx.drawImage(bmp, (c.width - w) / 2, (c.height - h) / 2, w, h);
+  return c;
 }
 
 function montarFita() {
   const fita = $('fita'); fita.replaceChildren();
+  if (est.acum) {  // cartão do acumulado no fim da fita
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'quadro'; b.dataset.chave = 'acum';
+    const d1 = document.createElement('span'); d1.className = 'dia'; d1.textContent = 'Acumulado';
+    const d2 = document.createElement('span'); d2.className = 'data';
+    d2.textContent = est.base !== SEM_DATA ? `${rotuloData(est.base)} a ${rotuloData(somaDias(est.base, est.acum.dia))}` : 'período';
+    b.append(miniatura(est.acum.bmp), d1, d2);
+    b.setAttribute('aria-pressed', String($('chk-acum').checked));
+    b.setAttribute('aria-label', 'Chuva acumulada no último quadro' + ($('chk-acum').checked ? ', na animação' : ', fora da animação'));
+    b.addEventListener('click', () => { if (est.ocupado) return; $('chk-acum').checked = !$('chk-acum').checked; aoMudarAcum(); });
+    fita.append(b);
+  }
   for (const q of est.quadros) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'quadro'; b.dataset.dia = q.dia;
-    const c = document.createElement('canvas'); c.width = 196; c.height = 124;
-    const ctx = c.getContext('2d'), esc = Math.min(c.width / q.bmp.width, c.height / q.bmp.height);
-    const w = q.bmp.width * esc, h = q.bmp.height * esc;
-    ctx.fillStyle = '#fff'; ctx.fillRect((c.width - w) / 2, (c.height - h) / 2, w, h);
-    ctx.imageSmoothingQuality = 'high'; ctx.drawImage(q.bmp, (c.width - w) / 2, (c.height - h) / 2, w, h);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'quadro'; b.dataset.dia = q.dia; b.dataset.chave = String(q.dia);
+    const c = miniatura(q.bmp);
     const iso = dataDoDia(q.dia), hoje = q.dia === 0;
     const d1 = document.createElement('span'); d1.className = 'dia';
     d1.textContent = iso ? (hoje ? 'Hoje, ' : '') + diaSemana(iso) : 'Dia ' + q.dia;
@@ -573,13 +631,19 @@ function montarFita() {
     b.append(c, d1, d2);
     b.setAttribute('aria-pressed', String(!est.diasFora.has(q.dia)));
     b.setAttribute('aria-label', (iso ? diaSemana(iso) + ' ' + rotuloData(iso, true) : 'Dia ' + q.dia) + (est.diasFora.has(q.dia) ? ', fora da animação' : ', na animação'));
-    b.addEventListener('click', () => {
+    b.addEventListener('click', async () => {
       if (est.ocupado) return;
       est.diasFora.has(q.dia) ? est.diasFora.delete(q.dia) : est.diasFora.add(q.dia);
-      limparResultado(); montarFita(); atualizarBotoes(); est.frame = 0; mostrarPrevia();
+      limparResultado(); await prepararAcumulado();  // o acumulado segue o último dia marcado
+      montarFita(); atualizarBotoes(); est.frame = 0; mostrarPrevia();
     });
-    fita.append(b);
+    const acum = fita.querySelector('[data-chave="acum"]');
+    acum ? fita.insertBefore(b, acum) : fita.append(b);
   }
+}
+
+function aoMudarAcum() {
+  salvarPrefs(); limparResultado(); montarFita(); atualizarBotoes(); est.frame = 0; mostrarPrevia(); status('');
 }
 
 function mostrarAviso(txt) {
@@ -590,8 +654,8 @@ function mostrarAviso(txt) {
 }
 
 function mostrarPrevia() {
-  const lista = incluidos();
-  $('fita-conta').textContent = est.quadros ? `${lista.length} de ${est.quadros.length} dias na animação` : '';
+  const lista = sequencia(), dias = incluidos().length;
+  $('fita-conta').textContent = est.quadros ? `${dias} de ${est.quadros.length} dias na animação` + (usarAcum() ? ' + acumulado' : '') : '';
   if (!lista.length) { mostrarAviso('Todos os dias estão fora. Clique num dia da fita para incluir.'); return; }
   const m = medidas(lista), cv = $('previa');
   if (cv.width !== m.W || cv.height !== m.H) { cv.width = m.W; cv.height = m.H; }
@@ -602,7 +666,7 @@ function mostrarPrevia() {
   const passo = () => {
     const i = est.frame % lista.length, q = lista[i];
     desenhar(ctx, q.bmp, m);
-    for (const b of $('fita').children) b.classList.toggle('atual', Number(b.dataset.dia) === q.dia);
+    for (const b of $('fita').children) b.classList.toggle('atual', b.dataset.chave === chaveQuadro(q));
     if (!est.tocando || lista.length < 2) return;
     const tempo = Number($('sel-tempo').value) * 1000 + (i === lista.length - 1 ? Number($('sel-pausa').value) * 1000 : 0);
     est.frame = i + 1;
@@ -853,9 +917,10 @@ class Zip {
 function status(txt, ruim) { $('status').textContent = txt; $('status').classList.toggle('ruim', !!ruim); }
 
 function atualizarBotoes() {
-  const n = incluidos().length;
+  const n = sequencia().length;
   $('criar').disabled = est.ocupado || n < 2;
   $('criar-lote').disabled = est.ocupado;
+  $('chk-acum').disabled = est.ocupado;
   for (const el of document.querySelectorAll('.lado select, .lote input')) el.disabled = est.ocupado || (el.tagName === 'SELECT' && el.options.length < 2);
   for (const el of document.querySelectorAll('input[name="formato"]')) el.disabled = est.ocupado || el.dataset.indisponivel === '1';
   if (!est.ocupado && est.quadros) status(n < 2 ? 'Deixe pelo menos 2 dias na fita para montar a animação.' : '');
@@ -873,7 +938,7 @@ function limparLote() {
 }
 
 async function criarUm() {
-  const lista = incluidos();
+  const lista = sequencia();
   if (est.ocupado || lista.length < 2) return;
   const formato = formatoAtual(), F = FORMATOS[formato];
   est.ocupado = true; atualizarBotoes(); limparResultado();
@@ -885,7 +950,7 @@ async function criarUm() {
     const blob = new Blob([res.bytes], {type: F.mime});
     est.resultadoURL = URL.createObjectURL(blob);
     pararAnimacao();
-    const descr = `${est.regiao.rotulo}: ${VARIAVEIS[est.tipo][0]}, animação de ${lista.length} dias`;
+    const descr = `${est.regiao.rotulo}: ${VARIAVEIS[est.tipo][0]}, animação de ${incluidos().length} dias` + (usarAcum() ? ' e chuva acumulada no fim' : '');
     $('previa').hidden = true; $('tocar').hidden = true;
     if (formato === 'gif') { const img = $('gif'); img.src = est.resultadoURL; img.alt = descr; img.hidden = false; }
     else { const v = $('video'); v.src = est.resultadoURL; v.setAttribute('aria-label', descr); v.hidden = false; v.play().catch(() => {}); }
@@ -912,6 +977,7 @@ async function criarLote() {
   est.ocupado = true; est.cancelar = false; atualizarBotoes(); limparLote();
   $('progresso').hidden = false; $('barra').style.width = '0';
   const zip = new Zip(), falhas = [], opcoes = opcoesAtuais(), formato = formatoAtual(), F = FORMATOS[formato];
+  const comAcum = $('chk-acum').checked;
   let feitos = 0, bytes = 0;
   for (const [r, tipo] of tarefas) {
     if (est.cancelar) break;
@@ -919,6 +985,8 @@ async function criarLote() {
     let bmps = [];
     try {
       bmps = await decodificar(quadrosDaSerie(r, tipo).filter(q => !est.diasFora.has(q.dia)));
+      const acum = comAcum && bmps.length ? entradaAcumulado(r, tipo, bmps.map(b => b.dia)) : null;
+      if (acum) bmps.push({dia: acum.dia, bmp: await createImageBitmap(await acum.ent.obter()), acumulado: true});
       if (bmps.length < 2) throw new Error('menos de 2 dias disponíveis');
       const barra = f => { $('barra').style.width = ((feitos + f) / tarefas.length * 100).toFixed(1) + '%'; };
       const res = formato === 'gif' ? await criarGifBlob(bmps, opcoes, barra) : await criarVideoBlob(bmps, opcoes, formato, barra);
@@ -951,8 +1019,9 @@ try {
   const p = JSON.parse(localStorage.getItem('gifs_previsao') || '{}');
   for (const id of PREFS) if (p[id] && [...$(id).options].some(o => o.value === p[id])) $(id).value = p[id];
   const r = p.formato && document.querySelector(`input[name="formato"][value="${p.formato}"]`); if (r) r.checked = true;
+  if (typeof p.acumulado === 'boolean') $('chk-acum').checked = p.acumulado;
 } catch {}
-const salvarPrefs = () => { try { localStorage.setItem('gifs_previsao', JSON.stringify({...Object.fromEntries(PREFS.map(id => [id, $(id).value])), formato: formatoAtual()})); } catch {} };
+const salvarPrefs = () => { try { localStorage.setItem('gifs_previsao', JSON.stringify({...Object.fromEntries(PREFS.map(id => [id, $(id).value])), formato: formatoAtual(), acumulado: $('chk-acum').checked})); } catch {} };
 
 for (const b of document.querySelectorAll('[data-abre]')) b.addEventListener('click', () => $(b.dataset.abre === 'zip' ? 'in-zip' : 'in-pasta').click());
 $('in-pasta').addEventListener('change', e => { const f = e.target.files; if (f && f.length) carregar(async () => entradasDeArquivos(f)); e.target.value = ''; });
@@ -979,6 +1048,7 @@ for (const r of document.querySelectorAll('input[name="formato"]')) r.addEventLi
 });
 aplicarFormato(); detectarFormatos();
 $('tocar').addEventListener('click', () => { est.tocando = !est.tocando; mostrarPrevia(); });
+$('chk-acum').addEventListener('change', aoMudarAcum);
 $('criar').addEventListener('click', criarUm);
 $('criar-lote').addEventListener('click', criarLote);
 $('cancelar').addEventListener('click', () => { est.cancelar = true; $('progresso-txt').textContent = 'Cancelando depois do arquivo atual…'; });

@@ -2,7 +2,9 @@ name: previsao-regioes
 
 # Coloque em .github/workflows/previsao_regioes.yml
 # Arquivos esperados na raiz do repo: gerar_previsao_regiao.py, estados.kml,
-# mesorregioes.kml e (opcional) logo.png. Saída: pasta previsao_regioes/.
+# mesorregioes.kml, Cidades_principais_137_mesorregioes_Brasil.csv
+# e (opcional) logo.png. Saída: pasta previsao_regioes/.
+# Todos os períodos usam America/Sao_Paulo, de 00 h a 00 h do dia seguinte.
 #
 # Uso manual: aba Actions > previsao-regioes > Run workflow.
 #   - "Todas as mesorregiões" já vem marcado -> é só clicar em Run.
@@ -18,7 +20,8 @@ on:
         type: boolean
         default: true
       dias:
-        description: "Dias de previsão"
+        description: "Dias: 0=hoje, 1=amanhã, até 7. Hoje é sempre incluído."
+        type: string
         default: "0 1 2 3 4 5 6 7"
       vars:
         description: "Variáveis: chuva tmin tmax nuvem"
@@ -38,6 +41,10 @@ on:
         description: "Caminho do KML de mesorregiões no repositório"
         type: string
         default: "mesorregioes.kml"
+      cidades:
+        description: "CSV ou KML com as cidades de referência"
+        type: string
+        default: "Cidades_principais_137_mesorregioes_Brasil.csv"
   schedule:
     # 06:05 de Brasília (BRT = UTC-3, sem horário de verão) = 09:05 UTC, todo dia.
     - cron: "5 9 * * *"
@@ -52,6 +59,8 @@ concurrency:
 jobs:
   gerar:
     runs-on: ubuntu-latest
+    env:
+      TZ: America/Sao_Paulo
     steps:
       - uses: actions/checkout@v4
 
@@ -67,41 +76,53 @@ jobs:
       - name: dependências python
         run: |
           python -m pip install --upgrade pip
-          pip install ecmwf-opendata xarray cfgrib numpy matplotlib
+          # >=0.3.34: aceita limite de tentativas e tem o espelho google
+          pip install "ecmwf-opendata>=0.3.34" xarray cfgrib numpy matplotlib
 
-      - name: data (UTC) para a chave de cache
+      - name: data de Brasília para a chave de cache
         id: dt
-        run: echo "d=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+        run: echo "d=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
-      - name: cache do download ECMWF do dia
-        uses: actions/cache@v4
+      # restore/save separados: o cache é salvo mesmo se a geração falhar,
+      # então um novo "Run workflow" continua de onde parou.
+      - name: restaurar cache do download ECMWF do dia
+        id: cache_ecmwf
+        uses: actions/cache/restore@v4
         with:
           path: .cache_ecmwf
-          key: ecmwf-cache-${{ steps.dt.outputs.d }}
+          key: ecmwf-brasilia-v1-${{ steps.dt.outputs.d }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ecmwf-brasilia-v1-${{ steps.dt.outputs.d }}-
+            ecmwf-brasilia-v1-
 
       - name: validar KMLs, criar pastas e gerar figuras
         env:
           TODAS:   ${{ github.event_name == 'schedule' || inputs.todas_meso }}
-          DIAS:    ${{ inputs.dias    || '1 2 3 4 5 6 7' }}
+          DIAS:    ${{ inputs.dias    || '0 1 2 3 4 5 6 7' }}
           VARS:    ${{ inputs.vars    || 'chuva tmin tmax nuvem' }}
           REGIOES: ${{ inputs.regioes || '' }}
           RECORTAR: ${{ inputs.recortar || false }}
           KML_ESTADOS: ${{ inputs.kml_estados || 'estados.kml' }}
           KML_MESO: ${{ inputs.kml_meso || 'mesorregioes.kml' }}
+          CIDADES: ${{ inputs.cidades || 'Cidades_principais_137_mesorregioes_Brasil.csv' }}
         run: |
           set -euo pipefail
           read -r -a dias_args <<< "$DIAS"
           read -r -a vars_args <<< "$VARS"
+          # Inclui hoje mesmo se o formulário enviar a configuração antiga (1 a 7).
+          # O script elimina dias repetidos antes de calcular e gerar as figuras.
           args=(
+            --todos-estados
             --kml "$KML_ESTADOS" "$KML_MESO"
             --fundo "$KML_ESTADOS"
             --kml-meso "$KML_MESO"
+            --cidades "$CIDADES"
             --logo logo.png
-            --vars "${vars_args[@]}" --dias "${dias_args[@]}"
+            --vars "${vars_args[@]}" --dias 0 "${dias_args[@]}"
             --saida previsao_regioes
           )
           if [ "$TODAS" = "true" ]; then
-            args+=(--todas-meso --todos-estados)
+            args+=(--todas-meso)
           elif [ -n "$REGIOES" ]; then
             args+=(--regioes "$REGIOES")
           else
@@ -114,6 +135,14 @@ jobs:
           # Confere a separação dos KMLs sem depender do ECMWF.
           python -u gerar_previsao_regiao.py "${args[@]}" --somente-estrutura
           python -u gerar_previsao_regiao.py "${args[@]}"
+
+      - name: salvar cache do download ECMWF (mesmo com falha)
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: .cache_ecmwf
+          key: ${{ steps.cache_ecmwf.outputs.cache-primary-key }}
 
       - name: guardar mapas e estrutura para download
         if: ${{ always() }}
@@ -133,7 +162,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Sem mudanças para commitar."; exit 0
           fi
-          git commit -m "previsão por região $(date -u +%Y-%m-%dT%H:%MZ)"
+          git commit -m "previsão por região $(date +%Y-%m-%dT%H:%M%z)"
           for i in 1 2 3 4 5; do
             git pull --rebase --autostash origin "${GITHUB_REF_NAME}" \
               && git push && exit 0 || (echo "retry $i..."; sleep 5)

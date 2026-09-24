@@ -295,7 +295,7 @@ async function nomearRegioes(regioes, infos) {
     const segUF = segs.find(s => UF_NOMES[s]);
     if (/^brasil$/i.test(r.alvo) || (info && info.tipo === 'brasil') || (!r.alvo && /^brasil$/i.test(segs[segs.length - 1] || ''))) {
       Object.assign(r, {tipo: 'brasil', uf: null, nome: 'Brasil'});
-    } else if (info && info.tipo === 'grupo' && info.nome) {  // grupo de pontos (ex.: MAGGI)
+    } else if (info && info.tipo === 'grupo' && info.nome) {  // grupo de pontos (ex.: AMAGGI)
       Object.assign(r, {tipo: 'grupo', uf: UF_NOMES[info.uf] ? info.uf : null, nome: String(info.nome).replace(/\s+/g, ' ').trim()});
     } else {
       const uf = [info && info.uf, alvoUF, segUF].find(u => u && UF_NOMES[u]) || null;

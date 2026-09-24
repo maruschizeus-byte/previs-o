@@ -1,6 +1,8 @@
 {
-  "MAGGI": {
+  "AMAGGI": {
     "estado": "MT",
+    "logo": "logoamaggi.png",
+    "logo_posicao": "inferior-esquerda",
     "mesorregioes": true,
     "pontos": [
       {"nome": "LEO", "lat": -17.036030, "lon": -54.178010},

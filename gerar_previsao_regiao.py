@@ -301,22 +301,26 @@ def carregar_geografia(caminhos, caminhos_fundo=None, caminhos_meso=None):
     return regioes, estados, mesos
 
 
-def selecionar_regiao(regioes, alvo):
+def selecionar_regiao(regioes, alvo, avisar=True):
     a = _sem_acento(alvo)
     exatos = [r for r in regioes if a in r["chaves"]]
     if exatos:
-        if len(exatos) > 1:
+        if len(exatos) > 1 and avisar:
             fontes = ", ".join(f"{r['nome']} ({r['arquivo']})" for r in exatos)
             print(f"  AVISO: '{alvo}' casou com {len(exatos)} regiões: {fontes}. "
                   f"Usando a primeira. Para desambiguar, use o código IBGE.")
         return exatos[0]
-    for r in regioes:
-        if any(k.startswith(a) or a.startswith(k) for k in r["chaves"] if k):
-            return r
-    for r in regioes:
-        if any(a in k for k in r["chaves"] if k):
-            return r
-    return None
+    # Busca aproximada. Siglas e códigos curtos (SP, MA, 31...) só valem exatos:
+    # antes, qualquer nome começando com "ma" virava Maranhão sem aviso.
+    if len(a) < 3:
+        return None
+    achado = next((r for r in regioes if any(len(k) >= 3 and (k.startswith(a) or a.startswith(k))
+                                              for k in r["chaves"] if k)), None)
+    if achado is None:
+        achado = next((r for r in regioes if any(len(k) >= 3 and a in k for k in r["chaves"] if k)), None)
+    if achado is not None and avisar:
+        print(f"  AVISO: '{alvo}' não é um nome exato; usando {achado['nome']} ({achado['arquivo']}).")
+    return achado
 
 
 def bbox_regiao(regiao):
@@ -600,13 +604,14 @@ def ponto_na_regiao(lon, lat, regiao):
 
 
 # =========================================================================
-# GRUPOS DE PONTOS (ex.: MAGGI) — definidos em grupos.json
+# GRUPOS DE PONTOS (ex.: AMAGGI) — definidos em grupos.json
 # =========================================================================
 GRUPOS_PADRAO = "grupos.json"
+POSICOES_LOGO = ("inferior-esquerda", "inferior-direita", "superior-esquerda", "superior-direita")
 
 
 def ler_grupos(caminho):
-    """{"MAGGI": {"estado": "MT", "mesorregioes": true, "pontos": [{nome, lat, lon}]}}"""
+    """{"AMAGGI": {"estado": "MT", "logo": "logoamaggi.png", "pontos": [{nome, lat, lon}]}}"""
     try:
         with open(caminho, encoding="utf-8") as fp:
             dados = json.load(fp)
@@ -639,9 +644,35 @@ def ler_grupos(caminho):
             pontos.append({"nome": rotulo, "lat": lat, "lon": lon})
         if not pontos:
             raise ValueError(f"grupo {nome}: nenhum ponto informado")
-        grupos[nome] = {"nome": nome, "uf": uf, "pontos": pontos,
-                        "mesorregioes": bool(cfg.get("mesorregioes", True))}
+        logo = str(cfg.get("logo") or "").strip() or None
+        logo_pos = str(cfg.get("logo_posicao") or "inferior-esquerda").strip()
+        if logo_pos not in POSICOES_LOGO:
+            raise ValueError(f"grupo {nome}: logo_posicao deve ser uma de {', '.join(POSICOES_LOGO)}")
+        grupos[nome] = {"nome": nome, "uf": uf, "pontos": pontos, "logo": logo, "logo_pos": logo_pos,
+                        "mesorregioes": bool(cfg.get("mesorregioes", True)),
+                        # nomes escritos dentro das mesorregiões: desligado por padrão
+                        "nomes_mesorregioes": bool(cfg.get("nomes_mesorregioes", False))}
     return grupos
+
+
+def remover_grupos_orfaos(saida, grupos):
+    """Apaga pastas de grupo (regiao.json com tipo "grupo") que não estão mais no grupos.json."""
+    import shutil
+    validos = {k.casefold() for k in grupos}
+    try:
+        pastas = sorted(os.listdir(saida))
+    except OSError:
+        return
+    for nome in pastas:
+        pasta = os.path.join(saida, nome)
+        try:
+            with open(os.path.join(pasta, "regiao.json"), encoding="utf-8") as fp:
+                info = json.load(fp)
+        except (OSError, ValueError):
+            continue
+        if isinstance(info, dict) and info.get("tipo") == "grupo" and str(info.get("nome", "")).casefold() not in validos:
+            shutil.rmtree(pasta)
+            print(f"Removida a pasta {nome}/: o grupo {info.get('nome')} não está mais em grupos.json.")
 
 
 def _area_anel(anel):
@@ -1045,7 +1076,7 @@ def nome_no_mapa(regiao, estados=None):
     """Nome completo da área e UF, sem repetir uma sigla já presente no KML."""
     if regiao is None:
         return "Brasil"
-    if regiao.get("nome_mapa"):  # grupo de pontos: "MAGGI — Mato Grosso"
+    if regiao.get("nome_mapa"):  # grupo de pontos: "AMAGGI — Mato Grosso"
         return regiao["nome_mapa"]
     nome = " ".join(regiao["nome"].split())
     uf = uf_sigla(regiao, estados)
@@ -1139,7 +1170,7 @@ def _add_logo(fig, ax, caminho, pos, escala, alpha, fundo=True):
         img = mpimg.imread(caminho)
     except Exception as e:
         print(f"    (aviso: não consegui ler a logo {caminho}: {e})")
-        return
+        return None
     ax_w_in = fig.get_size_inches()[0] * ax.get_position().width
     alvo_px = max(escala * ax_w_in * fig.dpi, 1.0)
     zoom = alvo_px / img.shape[1]
@@ -1156,6 +1187,7 @@ def _add_logo(fig, ax, caminho, pos, escala, alpha, fundo=True):
                         box_alignment=ba, frameon=fundo, pad=0.5,
                         bboxprops=bboxprops, zorder=10)
     ax.add_artist(ab)
+    return ab
 
 
 def _sobreposicao(a, b):
@@ -1164,12 +1196,12 @@ def _sobreposicao(a, b):
     return w * h if w > 0 and h > 0 else 0.0
 
 
-def _rotular_grupo(ax, renderer, grupo):
-    """Triângulos nos pontos do grupo e rótulos que desviam uns dos outros."""
+def _rotular_grupo(ax, renderer, grupo, obstaculos=()):
+    """Triângulos nos pontos do grupo e rótulos que desviam uns dos outros e das logos."""
     import matplotlib.patheffects as pe
     from matplotlib.transforms import Bbox
     eixo = ax.get_window_extent(renderer)
-    ocupado, disp = [], []
+    ocupado, disp = list(obstaculos), []
     for p in grupo["pontos"]:
         ax.plot(p["lon"], p["lat"], linestyle="none", marker="^", markersize=9,
                 markerfacecolor="#111111", markeredgecolor="white", markeredgewidth=1.2, zorder=8)
@@ -1259,7 +1291,7 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
             for poly in r["poligonos"]:
                 xy = np.array(poly)
                 ax.plot(xy[:, 0], xy[:, 1], color="black", linewidth=0.5, alpha=0.55)
-    # Grupo de pontos (ex.: MAGGI): mesorregiões do estado em tracejado.
+    # Grupo de pontos (ex.: AMAGGI): mesorregiões do estado em tracejado.
     grupo = regiao if regiao is not None and regiao.get("pontos") else None
     for r in (grupo or {}).get("contornos") or []:
         for poly in r["poligonos"]:
@@ -1311,8 +1343,20 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     # Ajusta nomes compridos em linhas completas, sem cobrir o mapa.
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
-    if grupo:  # depois do desenho: a posição final do mapa já está definida
-        _rotular_grupo(ax, renderer, grupo)
+    # Logos depois do desenho (a posição final do mapa já está definida) e
+    # antes dos rótulos do grupo, para os rótulos desviarem delas.
+    logos = []
+    if logo:
+        logos.append(_add_logo(fig, ax, logo, logo_pos, logo_escala, logo_alpha, fundo=logo_fundo))
+    logo_grupo = (regiao or {}).get("logo_grupo")
+    if logo_grupo:
+        pos_grupo = logo_grupo[1]
+        if logo and pos_grupo == logo_pos:  # mesmo canto da logo principal: vai para o lado oposto
+            pos_grupo = pos_grupo.replace("direita", "X").replace("esquerda", "direita").replace("X", "esquerda")
+        logos.append(_add_logo(fig, ax, logo_grupo[0], pos_grupo, logo_escala, logo_alpha, fundo=logo_fundo))
+    if grupo:
+        fig.canvas.draw()
+        _rotular_grupo(ax, renderer, grupo, [a.get_window_extent(renderer).padded(4) for a in logos if a])
     largura_px = ax.get_window_extent(renderer).width
     nome_alvo = nome_no_mapa(regiao, fundo)
     cabecalho = _quebrar_texto_mapa(nome_alvo, largura_px, renderer, 14, "bold")
@@ -1330,9 +1374,6 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     ax.annotate("Fonte: ECMWF", xy=(0, 0), xycoords="axes fraction",
                 xytext=(0, -13), textcoords="offset points", ha="left", va="top",
                 fontsize=9, color="#46515e")
-
-    if logo:
-        _add_logo(fig, ax, logo, logo_pos, logo_escala, logo_alpha, fundo=logo_fundo)
 
     if rodape:
         ax.annotate(rodape, xy=(0, 0), xycoords="axes fraction",
@@ -1385,7 +1426,7 @@ def _caminho_painel(caminho):
 def escrever_catalogo(saida, alvos, estados, hoje, dias_dados, rodada, gerado_em):
     """Grava mapas.json só com PNGs que existem (escrita atômica).
 
-    Numa execução parcial (ex.: só o MAGGI), mantém as áreas que já estavam no
+    Numa execução parcial (ex.: só o AMAGGI), mantém as áreas que já estavam no
     catálogo do mesmo dia, para o painel não perder o restante.
     """
     regioes, ausentes, ignorados = [], 0, 0
@@ -1520,9 +1561,9 @@ def main():
     ap.add_argument("--todos-estados", action="store_true", default=True,
                     help="compatibilidade: os estados são sempre gerados em <saida>/<UF>/")
     ap.add_argument("--sem-estados", action="store_true",
-                    help="NÃO gerar os 27 estados (útil para rodar só um grupo, ex.: MAGGI)")
+                    help="NÃO gerar os 27 estados (útil para rodar só um grupo, ex.: AMAGGI)")
     ap.add_argument("--grupo", nargs="+", default=None,
-                    help="grupo(s) de pontos do grupos.json: nomes (ex.: MAGGI), 'todos' ou 'nenhum'")
+                    help="grupo(s) de pontos do grupos.json: nomes (ex.: AMAGGI), 'todos' ou 'nenhum'")
     ap.add_argument("--grupos", default=GRUPOS_PADRAO,
                     help=f"arquivo que define os grupos de pontos (padrão: {GRUPOS_PADRAO})")
     ap.add_argument("--somente-estrutura", action="store_true",
@@ -1571,6 +1612,28 @@ def main():
     pedidos_grupo = [g.strip() for item in (args.grupo or []) for g in re.split(r"[;,\s]+", item) if g.strip()]
     if all(g.casefold() == "nenhum" for g in pedidos_grupo):
         pedidos_grupo = []
+    caminho_grupos = args.grupos
+    if not os.path.isfile(caminho_grupos) and not os.path.isabs(caminho_grupos):
+        caminho_grupos = os.path.join(os.path.dirname(__file__), caminho_grupos)
+    grupos = None
+    if pedidos_grupo or (pedidos and os.path.isfile(caminho_grupos)):
+        if not os.path.isfile(caminho_grupos):
+            sys.exit(f"ERRO: {args.grupos} não encontrado. Ele define os grupos de pontos (ex.: AMAGGI); "
+                     "coloque-o na raiz do repositório ou ajuste --grupos.")
+        try:
+            grupos = ler_grupos(caminho_grupos)
+        except (ValueError, OSError) as e:
+            if pedidos_grupo:
+                sys.exit(f"ERRO em {args.grupos}: {e}")
+            print(f"  AVISO: {args.grupos} ignorado ({e}).")
+    if grupos and pedidos:
+        # Nome de grupo digitado em Regiões (ex.: AMAGGI) vale como grupo.
+        nomes_grupo = {k.casefold() for k in grupos}
+        em_regioes = [p for p in pedidos if p.strip().casefold() in nomes_grupo]
+        if em_regioes:
+            print(f"'{'; '.join(em_regioes)}' é grupo de pontos: gerando como grupo, não como região.")
+            pedidos = [p for p in pedidos if p.strip().casefold() not in nomes_grupo]
+            pedidos_grupo += [p.strip() for p in em_regioes]
     if not pedidos and args.sem_brasil and not args.todas_meso and args.sem_estados and not pedidos_grupo:
         sys.exit("Nada a gerar: sem regiões, grupos, Brasil, estados ou mesorregiões.")
 
@@ -1606,7 +1669,7 @@ def main():
                 sys.exit(f"ERRO nas cidades: {e}")
             print(f"Cidades: {len(cidades_arquivo)} ponto(s) de {caminho_cidades}")
         elif args.todas_meso or any(r["tipo"] == "mesorregiao" for r in
-                                  (selecionar_regiao(regioes, p) for p in pedidos) if r):
+                                  (selecionar_regiao(regioes, p, avisar=False) for p in pedidos) if r):
             sys.exit(f"ERRO: arquivo de cidades não encontrado: {args.cidades}. "
                      "Coloque o CSV de cidades no repositório ou ajuste --cidades.")
     cidades_cli = []
@@ -1627,16 +1690,6 @@ def main():
 
     grupos_sel = []
     if pedidos_grupo:
-        caminho_grupos = args.grupos
-        if not os.path.isfile(caminho_grupos) and not os.path.isabs(caminho_grupos):
-            caminho_grupos = os.path.join(os.path.dirname(__file__), caminho_grupos)
-        if not os.path.isfile(caminho_grupos):
-            sys.exit(f"ERRO: {args.grupos} não encontrado. Ele define os grupos de pontos (ex.: MAGGI); "
-                     "coloque-o na raiz do repositório ou ajuste --grupos.")
-        try:
-            grupos = ler_grupos(caminho_grupos)
-        except (ValueError, OSError) as e:
-            sys.exit(f"ERRO em {args.grupos}: {e}")
         if any(g.casefold() == "todos" for g in pedidos_grupo):
             grupos_sel = list(grupos.values())
         else:
@@ -1713,13 +1766,25 @@ def main():
             print(f"  AVISO: grupo {g['nome']}: nenhuma mesorregião de {uf} no KML; sai só o contorno do estado.")
         evitar = [(p["lon"], p["lat"]) for p in g["pontos"]]
         rotulos = []
-        for r in contornos:
+        for r in contornos if g["nomes_mesorregioes"] else []:
             nome = re.sub(rf"\s*(?:[-–—/]\s*{uf}|\({uf}\))$", "", " ".join(r["nome"].split()), flags=re.I)
             if len(nome) > 14 and " " in nome:  # duas linhas, quebrando no espaço mais central
                 meio = min((i for i, c in enumerate(nome) if c == " "), key=lambda i: abs(i - len(nome) / 2))
                 nome = nome[:meio] + "\n" + nome[meio + 1:]
             rotulos.append((nome, *ponto_para_rotulo(r, evitar)))
+        logo_grupo = None
+        if g["logo"]:
+            caminho_logo = g["logo"]
+            if not os.path.isfile(caminho_logo) and not os.path.isabs(caminho_logo):
+                caminho_logo = os.path.join(os.path.dirname(caminho_grupos) or ".", g["logo"])
+            if os.path.isfile(caminho_logo):
+                logo_grupo = (caminho_logo, g["logo_pos"])
+                print(f"Logo do grupo {g['nome']}: {caminho_logo} ({g['logo_pos']})")
+            else:
+                print(f"  AVISO: logo do grupo {g['nome']} não encontrada ({g['logo']}); seguindo sem ela. "
+                      "Coloque o arquivo na raiz do repositório.")
         reg = dict(estado, nome=g["nome"], tipo="grupo", campos=dict(estado["campos"], sigla=uf),
+                   logo_grupo=logo_grupo,
                    pontos=g["pontos"], contornos=contornos, rotulos_contornos=rotulos,
                    nome_mapa=f"{g['nome']} — {UF_NOMES[uf]}")
         xs = [lon for poly in estado["poligonos"] for lon, _ in poly] + [p["lon"] for p in g["pontos"]]
@@ -1789,7 +1854,15 @@ def main():
 
     print("=== Fase 2: recortes e figuras (sem rede) ===")
     total_esperado = sum(len(alvos) * len(d["produtos"]) for d in dias_dados.values())
-    print(f"A gerar {total_esperado} figura(s): {len(alvos)} alvos, {len(dias_dados)} dias.")
+    por_tipo = {}
+    for _, r, _, _ in alvos:
+        t = "brasil" if r is None else r["tipo"]
+        por_tipo[t] = por_tipo.get(t, 0) + 1
+    rotulos_tipo = {"brasil": "Brasil", "estado": "estados", "mesorregiao": "mesorregiões", "grupo": "grupos"}
+    partes = ", ".join(f"{rotulos_tipo.get(t, t)} {n}" for t, n in por_tipo.items())
+    mapas_dia = len(next(iter(dias_dados.values()))["produtos"]) if dias_dados else 0
+    print(f"A gerar {total_esperado} figura(s): {len(alvos)} áreas ({partes}) × {mapas_dia} mapas "
+          f"× {len(dias_dados)} dias.")
     inicio = time.time()
     total = 0
     substituicoes = []
@@ -1817,6 +1890,8 @@ def main():
                     restam = (total_esperado - total) / taxa if taxa else 0
                     print(f"    {total}/{total_esperado} figuras | {seg:.0f}s | ~{restam:.0f}s restantes")
         print(f"  dia {dias}d concluído")
+    if grupos:
+        remover_grupos_orfaos(args.saida, grupos)
     # Catálogo primeiro: aponta só para os mapas novos, que já existem.
     gerado_em = dt.datetime.now(BRASILIA).isoformat(timespec="seconds")
     escrever_catalogo(args.saida, alvos, fundo_regioes, hoje, dias_dados,

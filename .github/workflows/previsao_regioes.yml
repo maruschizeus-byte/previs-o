@@ -3,15 +3,16 @@ name: previsao-regioes
 # Coloque em .github/workflows/previsao_regioes.yml
 # Arquivos esperados na raiz do repo: gerar_previsao_regiao.py, estados.kml,
 # mesorregioes.kml, Cidades_principais_137_mesorregioes_Brasil.csv,
-# grupos.json (grupos de pontos, ex.: MAGGI) e (opcional) logo.png.
-# Saída: pasta previsao_regioes/ (o MAGGI fica em previsao_regioes/MAGGI/).
+# grupos.json (grupos de pontos, ex.: AMAGGI), logoamaggi.png e (opcional) logo.png.
+# Saída: pasta previsao_regioes/ (o AMAGGI fica em previsao_regioes/AMAGGI/).
 # Todos os períodos usam America/Sao_Paulo, de 00 h a 00 h do dia seguinte.
 #
 # Uso manual: aba Actions > previsao-regioes > Run workflow.
 #   - "Todas as mesorregiões" já vem marcado -> é só clicar em Run.
 #   - Para gerar só algumas regiões, DESMARQUE e preencha "Regiões".
-#   - Para gerar SÓ o MAGGI: desmarque, deixe "Regiões" vazio e escreva MAGGI
-#     em "Grupos". Leva poucos minutos e não mexe nos outros mapas do dia.
+#   - Para gerar SÓ o AMAGGI: desmarque e escreva AMAGGI em "Grupos" (com
+#     "Regiões" vazio) ou em "Regiões". São 40 figuras (5 mapas x 8 dias) e os
+#     outros mapas do dia continuam no painel.
 #   - Confira os caminhos dos KMLs, inclusive letras maiúsculas/minúsculas.
 #   - As pastas incluem regiao.json e são preparadas antes dos downloads.
 
@@ -33,7 +34,7 @@ on:
         description: "Só se DESMARCAR acima — regiões (ex.: SP;MG;3105)"
         default: ""
       grupos:
-        description: "Grupos de pontos do grupos.json (ex.: MAGGI). todos = todos; vazio = nenhum"
+        description: "Grupos de pontos do grupos.json (ex.: AMAGGI). todos = todos; vazio = nenhum"
         type: string
         default: "todos"
       recortar:
@@ -130,6 +131,18 @@ jobs:
             --saida previsao_regioes
           )
           read -r -a grupos_args <<< "${GRUPOS//[;,]/ }"
+          # AMAGGI digitado em "Regiões" (e nada mais) vale como pedir só esse grupo.
+          if [ "$TODAS" != "true" ] && [ -n "$REGIOES" ] && [ -f grupos.json ] && python - "$REGIOES" <<'PY'
+          import json, sys
+          grupos = {k.casefold() for k in json.load(open("grupos.json", encoding="utf-8"))}
+          itens = [x.strip().casefold() for x in sys.argv[1].split(";") if x.strip()]
+          sys.exit(0 if itens and all(x in grupos for x in itens) else 1)
+          PY
+          then
+            echo "Regiões contém só grupo(s) de pontos: $REGIOES. Gerando só o(s) grupo(s)."
+            read -r -a grupos_args <<< "${REGIOES//[;,]/ }"
+            REGIOES=""
+          fi
           if [ "${#grupos_args[@]}" -gt 0 ]; then
             args+=(--grupos grupos.json --grupo "${grupos_args[@]}")
           fi
@@ -138,10 +151,10 @@ jobs:
           elif [ -n "$REGIOES" ]; then
             args+=(--regioes "$REGIOES")
           elif [ "${#grupos_args[@]}" -gt 0 ]; then
-            # Só os grupos (ex.: MAGGI): sem Brasil e sem os 27 estados.
+            # Só os grupos (ex.: AMAGGI): sem Brasil e sem os 27 estados.
             args+=(--sem-brasil --sem-estados)
           else
-            echo "::error::Marque Todas as mesorregiões, preencha Regiões ou informe Grupos (ex.: MAGGI)."
+            echo "::error::Marque Todas as mesorregiões, preencha Regiões ou informe Grupos (ex.: AMAGGI)."
             exit 1
           fi
           if [ "$RECORTAR" = "true" ]; then

@@ -7,9 +7,14 @@ COMO ATUALIZAR NO GITHUB
 4. Mantenha seus arquivos estados.kml, mesorregioes.kml e a logo.png opcional.
 5. Em Actions > previsao-regioes > Run workflow, use dias: 0 1 2 3 4 5 6 7.
    Confira os caminhos dos KMLs e do CSV nos campos do formulário.
+   O workflow sempre acrescenta hoje (0), inclusive se o campo dias ainda
+   estiver como 1 2 3 4 5 6 7. O script elimina repetições.
+   Atualize os dois arquivos (Python e workflow) antes de iniciar a execução.
 
 RESULTADO
 - 0d = hoje; 1d = amanhã; ...; 7d = sete dias depois de hoje.
+- Com 137 mesorregiões, 27 UFs, Brasil, oito dias e todas as variáveis,
+  são 6.600 figuras (165 áreas x 8 dias x 5 tipos de mapa).
 - Todos os estados do KML são gerados a cada execução, inclusive quando forem
   selecionadas somente algumas mesorregiões.
 - Brasil: previsao_regioes/brasil/.
@@ -17,8 +22,19 @@ RESULTADO
 - Mesorregiões: previsao_regioes/UF/Nome da mesorregião/.
 - A cidade de referência aparece como ponto e nome nos mapas da mesorregião.
   A associação prioriza código IBGE, depois nome/UF e, por último, coordenadas.
-- Nos mapas diários, aparece apenas dia da semana e data, por exemplo:
-  qua — 23/set/26. Não há nota de interpolação nem menção ao fuso nas imagens.
+- O cabeçalho mostra nome completo da região e UF; na linha seguinte,
+  variável, unidade e data. A fonte ECMWF aparece abaixo do mapa.
+  A logo.png atual continua sendo usada, quando presente no repositório.
+- A indicação temporal dos mapas diários é apenas dia da semana e data,
+  por exemplo: qua — 23/set/26. Acumulados mostram as datas inicial e final.
+  Não há nota de interpolação nem menção ao fuso nas imagens.
+- Os PNGs identificam região, variável, horizonte e data no nome, por exemplo:
+  ecmwf_MG_triangulo_mineiro_alto_paranaiba_chuva_dia_0d_2026-09-23.png
+  Chuva acumulada inclui o intervalo de datas no nome.
+  Depois de concluir a geração, o programa substitui somente as versões
+  anteriores dos mesmos mapas, incluindo os nomes antigos ecmwf_*_0d.png.
+  Outros produtos/horizontes e arquivos com nomes próprios são preservados.
+  Atualize referências externas que utilizavam os nomes antigos dos PNGs.
 - O domínio dos dados cobre toda a moldura, inclusive o extremo leste do KML.
   A escala de cores acompanha a altura do mapa.
 
@@ -67,6 +83,11 @@ VALIDAÇÃO DESTA ENTREGA
 Foram verificados 16 cenários automatizados: períodos de Brasília, dia atual,
 virada de mês/ano, interpolação, rodada única, cache, média de nuvens, temperaturas,
 cidades do CSV real, estados obrigatórios, renderização de PNGs e workflow.
+Também foi conferida a execução do workflow com as entradas 1..7 e 0..7:
+ambas geram hoje e os sete dias seguintes, sem duplicar mapas do dia 0.
+Para a identificação completa, foram conferidos cabeçalhos longos, fonte,
+logo, cidade, nomes descritivos dos PNGs e substituição das versões anteriores.
+Se a renderização falhar, as versões anteriores não são removidas.
 A renderização usou dados meteorológicos e polígonos simulados. Os KMLs reais do
 repositório não estavam disponíveis nesta conversa, e a coleta real de GRIBs não
 foi executada neste ambiente. A execução real ocorre no GitHub Actions.

@@ -43,6 +43,7 @@ import json
 import hashlib
 import math
 import argparse
+import re
 import unicodedata
 import datetime as dt
 import xml.etree.ElementTree as ET
@@ -354,6 +355,16 @@ UF_NOME2SIGLA = {
     "sao paulo": "SP", "parana": "PR", "santa catarina": "SC",
     "rio grande do sul": "RS", "mato grosso do sul": "MS", "mato grosso": "MT",
     "goias": "GO", "distrito federal": "DF",
+}
+UF_NOMES = {
+    "RO": "Rondônia", "AC": "Acre", "AM": "Amazonas", "RR": "Roraima",
+    "PA": "Pará", "AP": "Amapá", "TO": "Tocantins", "MA": "Maranhão",
+    "PI": "Piauí", "CE": "Ceará", "RN": "Rio Grande do Norte", "PB": "Paraíba",
+    "PE": "Pernambuco", "AL": "Alagoas", "SE": "Sergipe", "BA": "Bahia",
+    "MG": "Minas Gerais", "ES": "Espírito Santo", "RJ": "Rio de Janeiro",
+    "SP": "São Paulo", "PR": "Paraná", "SC": "Santa Catarina",
+    "RS": "Rio Grande do Sul", "MS": "Mato Grosso do Sul", "MT": "Mato Grosso",
+    "GO": "Goiás", "DF": "Distrito Federal",
 }
 
 
@@ -822,6 +833,81 @@ def calcular_dia(campos, data, hoje, vars_sel):
 # =========================================================================
 # FIGURA
 # =========================================================================
+def nome_no_mapa(regiao, estados=None):
+    """Nome completo da área e UF, sem repetir uma sigla já presente no KML."""
+    if regiao is None:
+        return "Brasil"
+    nome = " ".join(regiao["nome"].split())
+    uf = uf_sigla(regiao, estados)
+    if uf:
+        if regiao.get("tipo") == "estado" or nome.upper() == uf:
+            nome = UF_NOMES[uf]
+        else:
+            nome = re.sub(rf"\s*(?:[-–—/]\s*{uf}|\({uf}\))$", "", nome,
+                          flags=re.IGNORECASE).strip()
+        return f"{nome} — {uf}"
+    return nome
+
+
+def prefixo_png(regiao, estados, tipo, dias):
+    """Prefixo estável por área/produto/horizonte, com caracteres portáveis."""
+    if regiao is None:
+        alvo = "brasil"
+    else:
+        uf = uf_sigla(regiao, estados)
+        nome = UF_NOMES.get(uf, regiao["nome"]) if regiao.get("tipo") == "estado" else regiao["nome"]
+        slug = re.sub(r"[^a-z0-9]+", "_", _sem_acento(nome)).strip("_") or "regiao"
+        alvo = f"{uf}_{slug}" if uf else slug
+    return f"ecmwf_{alvo}_{tipo}_{dias}d"
+
+
+def nome_png(regiao, estados, tipo, dias, hoje):
+    data = hoje + dt.timedelta(days=dias)
+    periodo = (f"{hoje.isoformat()}_a_{data.isoformat()}" if tipo == "chuva_acumulado"
+               else data.isoformat())
+    return f"{prefixo_png(regiao, estados, tipo, dias)}_{periodo}.png"
+
+
+def limpar_png_substituidos(pasta, prefixo, antigo, atual):
+    """Retira só versões anteriores deste mapa após concluir toda a geração.
+
+    Reconhece o nome legado exato e o prefixo gerado com datas ISO válidas.
+    Outros produtos, horizontes, arquivos e subpastas são preservados.
+    """
+    removidos = 0
+    for item in os.scandir(pasta):
+        if item.name == atual or not item.is_file(follow_symlinks=False):
+            continue
+        substituir = item.name == antigo
+        if item.name.startswith(prefixo + "_") and item.name.endswith(".png"):
+            datas = item.name[len(prefixo) + 1:-4].split("_a_")
+            if len(datas) in (1, 2):
+                try:
+                    substituir = all(dt.date.fromisoformat(s).isoformat() == s for s in datas)
+                except ValueError:
+                    pass
+        if substituir:
+            os.remove(item.path)
+            removidos += 1
+    return removidos
+
+
+def _quebrar_texto_mapa(texto, largura_px, renderer, tamanho, peso="normal"):
+    """Quebra por palavras conforme a largura renderizada, sem cortar nomes."""
+    from matplotlib.font_manager import FontProperties
+    fonte = FontProperties(size=tamanho, weight=peso)
+    linhas, linha = [], ""
+    for palavra in texto.split():
+        candidata = f"{linha} {palavra}".strip()
+        largura, _, _ = renderer.get_text_width_height_descent(candidata, fonte, False)
+        if linha and largura > largura_px:
+            linhas.append(linha)
+            linha = palavra
+        else:
+            linha = candidata
+    return "\n".join(linhas + [linha])
+
+
 def _caminho_poligono(regiao):
     from matplotlib.path import Path
     verts, codes = [], []
@@ -945,11 +1031,6 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     for sp in ax.spines.values():
         sp.set_visible(True); sp.set_linewidth(1.0)
 
-    nome_alvo = regiao["nome"] if regiao is not None else "Brasil"
-    # Duas linhas centralizadas evitam sobreposição em regiões estreitas.
-    ax.set_title(f"{nome_alvo} | {titulo}\n{periodo_txt}",
-                 fontsize=13, fontweight="bold", pad=10)
-
     # A legenda acompanha a altura real do mapa, inclusive em enquadramentos
     # largos/baixos; evita faixas brancas externas impostas pela colorbar.
     from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -958,15 +1039,39 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     cb.ax.tick_params(labelsize=15)
     cb.set_ticklabels(["%g" % t for t in ticks])
 
+    # O aspecto geográfico e a legenda definem a largura útil do cabeçalho.
+    # Ajusta nomes compridos em linhas completas, sem cobrir o mapa.
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    largura_px = ax.get_window_extent(renderer).width
+    nome_alvo = nome_no_mapa(regiao, fundo)
+    cabecalho = _quebrar_texto_mapa(nome_alvo, largura_px, renderer, 14, "bold")
+    subtitulo = _quebrar_texto_mapa(f"{titulo} · {periodo_txt}", largura_px,
+                                   renderer, 11)
+    if "\n" in subtitulo:
+        subtitulo = (_quebrar_texto_mapa(titulo, largura_px, renderer, 11) + "\n" +
+                     _quebrar_texto_mapa(periodo_txt, largura_px, renderer, 11))
+    altura_subtitulo = (subtitulo.count("\n") + 1) * 11 * 1.3
+    ax.set_title(cabecalho, fontsize=14, fontweight="bold",
+                 pad=altura_subtitulo + 16, linespacing=1.15)
+    ax.annotate(subtitulo, xy=(0.5, 1), xycoords="axes fraction",
+                xytext=(0, 10), textcoords="offset points", ha="center", va="bottom",
+                fontsize=11, color="#303844", linespacing=1.3)
+    ax.annotate("Fonte: ECMWF", xy=(0, 0), xycoords="axes fraction",
+                xytext=(0, -13), textcoords="offset points", ha="left", va="top",
+                fontsize=9, color="#46515e")
+
     if logo:
-        fig.canvas.draw()
         _add_logo(fig, ax, logo, logo_pos, logo_escala, logo_alpha, fundo=logo_fundo)
 
     if rodape:
-        ax.text(0.0, -0.025, rodape, transform=ax.transAxes,
-                fontsize=8, va="top", ha="left", linespacing=1.5)
+        ax.annotate(rodape, xy=(0, 0), xycoords="axes fraction",
+                    xytext=(0, -29), textcoords="offset points",
+                    fontsize=8, va="top", ha="left", linespacing=1.5)
 
-    fig.savefig(png_path, bbox_inches="tight", facecolor="white")
+    fig.savefig(png_path, bbox_inches="tight", facecolor="white",
+                metadata={"Title": f"{nome_alvo} | {titulo} | {periodo_txt}",
+                          "Source": "ECMWF", "Software": "gerar_previsao_regiao.py"})
     plt.close(fig)
 
 
@@ -1216,10 +1321,10 @@ def main():
     dias_dados = {}
     periodos = []
     definicoes = {
-        "chuva_acumulado": ("Acumulado (mm)", FAIXAS_CHUVA, CHUVA_ACIMA, None, "max"),
+        "chuva_acumulado": ("Chuva acumulada (mm)", FAIXAS_CHUVA, CHUVA_ACIMA, None, "max"),
         "chuva_dia": ("Chuva do dia (mm)", FAIXAS_CHUVA, CHUVA_ACIMA, None, "max"),
-        "tmin": ("Temp. mínima (°C)", FAIXAS_TEMP, TEMP_ACIMA, TEMP_ABAIXO, "both"),
-        "tmax": ("Temp. máxima (°C)", FAIXAS_TEMP, TEMP_ACIMA, TEMP_ABAIXO, "both"),
+        "tmin": ("Temperatura mínima (°C)", FAIXAS_TEMP, TEMP_ACIMA, TEMP_ABAIXO, "both"),
+        "tmax": ("Temperatura máxima (°C)", FAIXAS_TEMP, TEMP_ACIMA, TEMP_ABAIXO, "both"),
         "nuvem": ("Nuvens — média diária (%)", FAIXAS_NUVEM, None, None, "neither"),
     }
     for dias in dias_sel:
@@ -1248,13 +1353,15 @@ def main():
     print(f"A gerar {total_esperado} figura(s): {len(alvos)} alvos, {len(dias_dados)} dias.")
     inicio = time.time()
     total = 0
+    substituicoes = []
     for dias in sorted(dias_dados):
         d = dias_dados[dias]
         lons, lats, produtos = d["lons"], d["lats"], d["produtos"]
         for subdir, regiao, extent, cids in alvos:
             outdir = os.path.join(args.saida, subdir)
             for tipo, campo, titulo, per, faixas, c_a, c_b, ext_cb, rodape in produtos:
-                png = os.path.join(outdir, f"ecmwf_{tipo}_{dias}d.png")
+                arquivo_png = nome_png(regiao, fundo_regioes, tipo, dias, hoje)
+                png = os.path.join(outdir, arquivo_png)
                 plotar(lons, lats, campo, titulo, per, png, faixas,
                        cor_acima=c_a, cor_abaixo=c_b, extend=ext_cb,
                        extent=extent, regiao=regiao, fundo=fundo_regioes,
@@ -1262,6 +1369,8 @@ def main():
                        logo=logo, logo_pos=args.logo_pos,
                        logo_escala=args.logo_escala, logo_alpha=args.logo_alpha,
                        logo_fundo=not args.logo_sem_fundo, rodape=rodape)
+                substituicoes.append((outdir, prefixo_png(regiao, fundo_regioes, tipo, dias),
+                                       f"ecmwf_{tipo}_{dias}d.png", arquivo_png))
                 total += 1
                 if total % 50 == 0 or total == total_esperado:
                     seg = time.time() - inicio
@@ -1269,10 +1378,15 @@ def main():
                     restam = (total_esperado - total) / taxa if taxa else 0
                     print(f"    {total}/{total_esperado} figuras | {seg:.0f}s | ~{restam:.0f}s restantes")
         print(f"  dia {dias}d concluído")
+    # Só substitui arquivos antigos depois de todos os novos mapas estarem prontos.
+    removidos = sum(limpar_png_substituidos(*item) for item in substituicoes)
+    if removidos:
+        print(f"Substituídas {removidos} versões anteriores dos mapas gerados.")
     resumo = {"fuso": "America/Sao_Paulo", "data_base_brasilia": hoje.isoformat(),
               "rodada_utc": campos.rodada.isoformat(), "rodada_brasilia": rodada_brt.isoformat(),
               "gerado_em_brasilia": dt.datetime.now(BRASILIA).isoformat(),
               "total_mapas": total, "periodos": periodos,
+              "identificacao_mapas": "Região/UF, variável/unidade, data e fonte ECMWF",
               "nota": "São previsões do modelo, inclusive para as horas de hoje já transcorridas."}
     with open(os.path.join(args.saida, "previsao.json"), "w", encoding="utf-8") as fp:
         json.dump(resumo, fp, ensure_ascii=False, indent=2)

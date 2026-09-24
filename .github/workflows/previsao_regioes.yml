@@ -4,7 +4,11 @@ name: previsao-regioes
 # Arquivos esperados na raiz do repo: gerar_previsao_regiao.py, estados.kml,
 # mesorregioes.kml, Cidades_principais_137_mesorregioes_Brasil.csv,
 # grupos.json (grupos de pontos, ex.: AMAGGI), logoamaggi.png e (opcional) logo.png.
-# Saída: pasta previsao_regioes/ (o AMAGGI fica em previsao_regioes/AMAGGI/).
+# Saída: pasta previsao_regioes/ (o AMAGGI fica em previsao_regioes/AMAGGI/),
+# publicada no ramo "mapas". Esse ramo tem um único commit, trocado a cada
+# execução: os arquivos ficam no repositório, mas o histórico não cresce.
+# O ramo principal fica só com o código. Todo dia às 06:05 (Brasília) roda tudo:
+# Brasil, 27 estados, 137 mesorregiões e todos os grupos do grupos.json.
 # Todos os períodos usam America/Sao_Paulo, de 00 h a 00 h do dia seguinte.
 #
 # Uso manual: aba Actions > previsao-regioes > Run workflow.
@@ -69,8 +73,20 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TZ: America/Sao_Paulo
+      RAMO_MAPAS: mapas
     steps:
       - uses: actions/checkout@v4
+
+      - name: trazer os mapas publicados (ramo mapas)
+        # Mantém as áreas já publicadas numa execução parcial (ex.: só AMAGGI).
+        run: |
+          if git fetch --depth 1 origin "$RAMO_MAPAS" 2>/dev/null; then
+            rm -rf previsao_regioes
+            git archive FETCH_HEAD previsao_regioes | tar -x
+            echo "Mapas atuais trazidos do ramo $RAMO_MAPAS: $(find previsao_regioes -name '*.png' | wc -l) PNGs."
+          else
+            echo "Ramo $RAMO_MAPAS ainda não existe; começa com o que estiver na pasta."
+          fi
 
       - uses: actions/setup-python@v5
         with:
@@ -182,17 +198,44 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: commit e push das pastas e mapas
+      - name: publicar no ramo mapas (substitui a versão anterior)
         run: |
+          set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A previsao_regioes
-          if git diff --cached --quiet; then
-            echo "Sem mudanças para commitar."; exit 0
-          fi
-          git commit -m "previsão por região $(date +%Y-%m-%dT%H:%M%z)"
+          # Commit novo, sem pai, montado num índice à parte: não mexe no ramo principal.
+          export GIT_INDEX_FILE="$RUNNER_TEMP/indice-mapas"
+          rm -f "$GIT_INDEX_FILE"
+          git read-tree --empty
+          git add -f -- previsao_regioes
+          if [ -f index.html ]; then git add -f -- index.html; fi   # painel, se quiser GitHub Pages
+          vazio=$(git hash-object -w --stdin < /dev/null)
+          git update-index --add --cacheinfo "100644,$vazio,.nojekyll"
+          arvore=$(git write-tree)
+          commit=$(git commit-tree "$arvore" -m "mapas de previsão $(date +%Y-%m-%dT%H:%M%z)")
+          unset GIT_INDEX_FILE
           for i in 1 2 3 4 5; do
-            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" \
-              && git push && exit 0 || (echo "retry $i..."; sleep 5)
+            if git push --force origin "$commit:refs/heads/$RAMO_MAPAS"; then
+              echo "Publicado no ramo $RAMO_MAPAS: $(git ls-tree -r --name-only "$commit" | grep -c '\.png$') PNGs."
+              exit 0
+            fi
+            echo "retry $i..."; sleep 10
           done
-          echo "Falhou ao dar push após 5 tentativas."; exit 1
+          echo "Falhou ao publicar no ramo $RAMO_MAPAS após 5 tentativas."; exit 1
+
+      - name: tirar os mapas do ramo principal (só na primeira vez)
+        run: |
+          set -euo pipefail
+          if [ -z "$(git ls-files -- previsao_regioes | head -1)" ]; then
+            echo "O ramo principal já não guarda os mapas."; exit 0
+          fi
+          git rm -r -q --cached -- previsao_regioes
+          grep -qxF 'previsao_regioes/' .gitignore 2>/dev/null || echo 'previsao_regioes/' >> .gitignore
+          git add .gitignore
+          git commit -q -m "mapas passam a ficar no ramo $RAMO_MAPAS"
+          for i in 1 2 3 4 5; do
+            git pull -q --rebase --autostash origin "${GITHUB_REF_NAME}" \
+              && git push -q origin "HEAD:${GITHUB_REF_NAME}" && { echo "Pasta previsao_regioes/ removida do ramo ${GITHUB_REF_NAME}."; exit 0; } \
+              || { echo "retry $i..."; sleep 5; }
+          done
+          echo "Falhou ao atualizar o ramo principal após 5 tentativas."; exit 1

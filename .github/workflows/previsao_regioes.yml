@@ -2,13 +2,16 @@ name: previsao-regioes
 
 # Coloque em .github/workflows/previsao_regioes.yml
 # Arquivos esperados na raiz do repo: gerar_previsao_regiao.py, estados.kml,
-# mesorregioes.kml, Cidades_principais_137_mesorregioes_Brasil.csv
-# e (opcional) logo.png. Saída: pasta previsao_regioes/.
+# mesorregioes.kml, Cidades_principais_137_mesorregioes_Brasil.csv,
+# grupos.json (grupos de pontos, ex.: MAGGI) e (opcional) logo.png.
+# Saída: pasta previsao_regioes/ (o MAGGI fica em previsao_regioes/MAGGI/).
 # Todos os períodos usam America/Sao_Paulo, de 00 h a 00 h do dia seguinte.
 #
 # Uso manual: aba Actions > previsao-regioes > Run workflow.
 #   - "Todas as mesorregiões" já vem marcado -> é só clicar em Run.
 #   - Para gerar só algumas regiões, DESMARQUE e preencha "Regiões".
+#   - Para gerar SÓ o MAGGI: desmarque, deixe "Regiões" vazio e escreva MAGGI
+#     em "Grupos". Leva poucos minutos e não mexe nos outros mapas do dia.
 #   - Confira os caminhos dos KMLs, inclusive letras maiúsculas/minúsculas.
 #   - As pastas incluem regiao.json e são preparadas antes dos downloads.
 
@@ -29,6 +32,10 @@ on:
       regioes:
         description: "Só se DESMARCAR acima — regiões (ex.: SP;MG;3105)"
         default: ""
+      grupos:
+        description: "Grupos de pontos do grupos.json (ex.: MAGGI). todos = todos; vazio = nenhum"
+        type: string
+        default: "todos"
       recortar:
         description: "Recortar o preenchimento ao contorno da região"
         type: boolean
@@ -101,6 +108,7 @@ jobs:
           DIAS:    ${{ inputs.dias    || '0 1 2 3 4 5 6 7' }}
           VARS:    ${{ inputs.vars    || 'chuva tmin tmax nuvem' }}
           REGIOES: ${{ inputs.regioes || '' }}
+          GRUPOS:  ${{ github.event_name == 'schedule' && 'todos' || inputs.grupos }}
           RECORTAR: ${{ inputs.recortar || false }}
           KML_ESTADOS: ${{ inputs.kml_estados || 'estados.kml' }}
           KML_MESO: ${{ inputs.kml_meso || 'mesorregioes.kml' }}
@@ -121,12 +129,19 @@ jobs:
             --vars "${vars_args[@]}" --dias 0 "${dias_args[@]}"
             --saida previsao_regioes
           )
+          read -r -a grupos_args <<< "${GRUPOS//[;,]/ }"
+          if [ "${#grupos_args[@]}" -gt 0 ]; then
+            args+=(--grupos grupos.json --grupo "${grupos_args[@]}")
+          fi
           if [ "$TODAS" = "true" ]; then
             args+=(--todas-meso)
           elif [ -n "$REGIOES" ]; then
             args+=(--regioes "$REGIOES")
+          elif [ "${#grupos_args[@]}" -gt 0 ]; then
+            # Só os grupos (ex.: MAGGI): sem Brasil e sem os 27 estados.
+            args+=(--sem-brasil --sem-estados)
           else
-            echo "::error::Marque Todas as mesorregiões ou preencha Regiões."
+            echo "::error::Marque Todas as mesorregiões, preencha Regiões ou informe Grupos (ex.: MAGGI)."
             exit 1
           fi
           if [ "$RECORTAR" = "true" ]; then

@@ -600,10 +600,39 @@ def ponto_na_regiao(lon, lat, regiao):
 # =========================================================================
 # ECMWF: download e processamento (genérico por parâmetro)
 # =========================================================================
-# Fontes do ECMWF Open Data, em ordem de tentativa. Os espelhos em nuvem
-# (aws/azure) não têm o limite de 500 conexões do portal principal e evitam o
-# erro 429. 'ecmwf' fica por último, como reserva. Ajustável por --fonte.
-FONTES = ["aws", "azure", "ecmwf"]
+# Fontes do ECMWF Open Data, em ordem inicial de preferência. Os espelhos em
+# nuvem (aws/azure/google) não têm o limite de 500 conexões do portal
+# principal. 'ecmwf' (a origem) fica por último, como reserva. Ajustável por
+# --fonte. Durante a execução, a fonte que entrega um arquivo passa para o
+# início da lista e é a primeira tentada no arquivo seguinte.
+FONTES = ["aws", "azure", "google", "ecmwf"]
+
+# Política de tentativas. Por padrão, o Client do ecmwf-opendata faz até 500
+# tentativas com 120 s de pausa em CADA requisição (o .index consultado antes
+# de cada arquivo, o HEAD e o GET). Com "503 Slow Down" o script ficava muitos
+# minutos preso na mesma fonte antes de trocar. Agora a biblioteca desiste
+# cedo, o script troca de fonte e, se nenhuma entregar, espera e dá outra volta
+# — sempre pedindo a MESMA rodada.
+TENTATIVAS_POR_REQUISICAO = 3              # por requisição, dentro da biblioteca
+PAUSA_REQUISICAO_S = 5                     # pausa entre essas tentativas
+PAUSA_FONTE_S = 300                        # fonte com 503/429/erro de rede vai p/ o fim da fila
+PAUSAS_ENTRE_VOLTAS_S = (30, 60, 120, 240)  # esperas entre voltas completas nas fontes
+TIMEOUT_HTTP_S = (20, 120)                 # (conectar, ficar sem receber bytes)
+ORIGEM = "ecmwf"                           # os espelhos só copiam o que a origem publica
+
+
+class DadoAusente(RuntimeError):
+    """O arquivo não existe (404 ou índice sem o campo): rodada ainda não publicada."""
+
+
+class FontesIndisponiveis(RuntimeError):
+    """O arquivo pode existir, mas nenhuma fonte o entregou (503/429/rede)."""
+
+
+_CLIENTES = {}        # fonte -> Client reaproveitado (sessão HTTP e token SAS do Azure)
+_PAUSADA_ATE = {}     # fonte -> time.monotonic() até quando fica no fim da fila
+_ULTIMA_FONTE = []    # última fonte que entregou (só para o log)
+_AVISOS = set()
 
 
 def intervalo_brasilia(data):
@@ -635,21 +664,119 @@ def vizinhos_step(horas):
     return abaixo, acima, (horas - abaixo) / (acima - abaixo)
 
 
-def baixar(param, step, grib_file, data_rodada, hora_rodada):
-    """Cada espelho recebe exatamente a mesma rodada; nunca usa latest implícito."""
+def _novo_cliente(fonte):
+    """Client com tentativas internas curtas e timeout em todas as requisições."""
+    import inspect
+    import requests
     from ecmwf.opendata import Client
+
+    class _ComTimeout(requests.adapters.HTTPAdapter):
+        # A biblioteca não passa timeout: uma conexão parada travaria o job.
+        def send(self, request, **kw):
+            if kw.get("timeout") is None:
+                kw["timeout"] = TIMEOUT_HTTP_S
+            return super().send(request, **kw)
+
+    extras = {"maximum_retries": TENTATIVAS_POR_REQUISICAO,
+              "retry_after": PAUSA_REQUISICAO_S,
+              # Um Retry-After do servidor pode pedir minutos; é melhor trocar de fonte.
+              "use_server_retry_after": False}
+    aceitos = inspect.signature(Client.__init__).parameters
+    faltando = [k for k in extras if k not in aceitos]
+    if faltando and "versao" not in _AVISOS:
+        _AVISOS.add("versao")
+        print(f"  AVISO: ecmwf-opendata sem {', '.join(faltando)}; as tentativas internas "
+              "não serão limitadas. Atualize: pip install -U ecmwf-opendata")
+    cliente = Client(source=fonte, model="ifs", resol="0p25", infer_stream_keyword=False,
+                     **{k: v for k, v in extras.items() if k in aceitos})
+    adaptador = _ComTimeout()
+    cliente.session.mount("https://", adaptador)
+    cliente.session.mount("http://", adaptador)
+    return cliente
+
+
+def _status_http(e):
+    return getattr(getattr(e, "response", None), "status_code", None)
+
+
+def _arquivo_ausente(e):
+    """404 ou índice sem o campo: o arquivo não existe (ainda) nesta fonte."""
+    if _status_http(e) == 404:
+        return True
+    return isinstance(e, ValueError) and "Cannot find index entries" in str(e)
+
+
+def _resumo_erro(e):
+    """Mensagem curta para o log, sem URLs com token SAS."""
+    status = _status_http(e)
+    if status is not None:
+        return f"HTTP {status} {getattr(e.response, 'reason', '') or ''}".strip()
+    texto = re.sub(r"\?\S*", "?…", str(e))
+    return f"{type(e).__name__}: {texto[:160]}"
+
+
+def _ordem_fontes():
+    """Fontes livres na ordem de preferência; as pausadas vão para o fim."""
+    agora = time.monotonic()
+    livres = [f for f in FONTES if _PAUSADA_ATE.get(f, 0.0) <= agora]
+    pausadas = sorted((f for f in FONTES if f not in livres), key=lambda f: _PAUSADA_ATE[f])
+    return livres + pausadas
+
+
+def baixar(param, step, grib_file, data_rodada, hora_rodada):
+    """Baixa um campo de UMA rodada fixa (data e hora explícitas, nunca 'latest').
+
+    Todas as fontes recebem exatamente a mesma rodada. A fonte que entrega
+    passa a ser a primeira da fila; a que responde 503/429 ou falha na rede vai
+    para o fim da fila por PAUSA_FONTE_S. Levanta DadoAusente quando o arquivo
+    não existe e FontesIndisponiveis quando ele existe mas nenhuma fonte entregou.
+    """
     kw = dict(type="fc", stream="oper", param=param, step=step,
               target=grib_file, date=data_rodada.strftime("%Y%m%d"), time=hora_rodada)
+    rotulo = f"{param}/{step} h"
+    voltas = len(PAUSAS_ENTRE_VOLTAS_S) + 1
     ultimo = None
-    for fonte in FONTES:
-        try:
-            Client(source=fonte, model="ifs", resol="0p25",
-                   infer_stream_keyword=False).retrieve(**kw)
+    for volta in range(voltas):
+        tentadas = _ordem_fontes()
+        ausentes = []
+        for fonte in tentadas:
+            try:
+                if fonte not in _CLIENTES:
+                    _CLIENTES[fonte] = _novo_cliente(fonte)
+                if os.path.exists(grib_file):
+                    os.remove(grib_file)  # não retomar download parcial de outra fonte
+                _CLIENTES[fonte].retrieve(**kw)
+                if not os.path.isfile(grib_file) or os.path.getsize(grib_file) == 0:
+                    raise OSError("arquivo baixado vazio")
+            except Exception as e:
+                ultimo = e
+                if _arquivo_ausente(e):
+                    ausentes.append(fonte)
+                    print(f"    ({rotulo} ainda não está em {fonte}; tentando próxima)")
+                else:
+                    _PAUSADA_ATE[fonte] = time.monotonic() + PAUSA_FONTE_S
+                    _CLIENTES.pop(fonte, None)  # recria sessão (e token SAS) depois
+                    print(f"    (fonte {fonte}: {_resumo_erro(e)}; fica no fim da fila "
+                          f"por {PAUSA_FONTE_S // 60} min, tentando próxima)")
+                continue
+            FONTES.remove(fonte)
+            FONTES.insert(0, fonte)
+            _PAUSADA_ATE.pop(fonte, None)
+            if _ULTIMA_FONTE[-1:] != [fonte]:
+                _ULTIMA_FONTE[:] = [fonte]
+                print(f"    usando fonte {fonte} a partir de {rotulo}")
             return
-        except Exception as e:
-            ultimo = e
-            print(f"    (fonte {fonte}: {e}; tentando próxima)")
-    raise RuntimeError(f"Falha em {param}, passo {step} h: {ultimo}") from ultimo
+        # Os espelhos só têm o que a origem publicou: 404 na origem basta.
+        if len(ausentes) == len(tentadas) or ORIGEM in ausentes:
+            raise DadoAusente(f"{rotulo} não publicado (ausente em "
+                              f"{', '.join(ausentes)})") from ultimo
+        if volta < voltas - 1:
+            espera = PAUSAS_ENTRE_VOLTAS_S[volta]
+            print(f"    {rotulo}: nenhuma fonte entregou; nova volta em {espera} s "
+                  f"({volta + 2}/{voltas}), mesma rodada")
+            time.sleep(espera)
+    raise FontesIndisponiveis(f"{rotulo}: nenhuma fonte entregou após {voltas} voltas "
+                              f"(último erro: {_resumo_erro(ultimo)})") from ultimo
 
 
 def ler_grib(grib_file, param, dominio, rodada, step):
@@ -783,6 +910,12 @@ def escolher_rodada(hoje, dias, vars_sel, dominio, cache_dir=None, rodada_fixa=N
             _, ultimo_step, _ = vizinhos_step(_horas(rodada, fim))
             campos.nativo(parametro, ultimo_step)
             return campos
+        except FontesIndisponiveis as e:
+            # Servidor ocupado não é rodada inexistente: não recua para uma
+            # previsão mais antiga. O cache guarda o que já foi baixado.
+            raise RuntimeError(f"rodada {rodada.isoformat()} não pôde ser conferida porque "
+                               f"as fontes não responderam ({e}). Rode de novo em alguns "
+                               "minutos.") from e
         except Exception as e:
             erros.append(f"{rodada.isoformat()}: {e}")
             print(f"  Rodada indisponível: {e}")
@@ -1123,9 +1256,10 @@ def main():
                     help="KML(s) usados como contorno de fundo. Padrão: os que "
                          "tiverem 'estado' no nome do arquivo.")
     ap.add_argument("--fonte", nargs="+", default=None,
-                    choices=["aws", "azure", "ecmwf"],
-                    help="fonte(s) do ECMWF, em ordem de tentativa "
-                         "(padrão: aws azure ecmwf — espelhos primeiro, evita 429)")
+                    choices=["aws", "azure", "google", "ecmwf"],
+                    help="fonte(s) do ECMWF, em ordem inicial de preferência "
+                         "(padrão: aws azure google ecmwf — espelhos primeiro). "
+                         "A fonte que responder passa a ser a primeira.")
     ap.add_argument("--vars", nargs="+", default=VARS_VALIDAS, choices=VARS_VALIDAS,
                     help="variáveis a gerar (padrão: todas)")
     ap.add_argument("--dias", nargs="+", type=int, default=list(range(8)),

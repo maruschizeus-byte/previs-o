@@ -1371,13 +1371,10 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     ax.annotate(subtitulo, xy=(0.5, 1), xycoords="axes fraction",
                 xytext=(0, 10), textcoords="offset points", ha="center", va="bottom",
                 fontsize=11, color="#303844", linespacing=1.3)
-    ax.annotate("Fonte: ECMWF", xy=(0, 0), xycoords="axes fraction",
-                xytext=(0, -13), textcoords="offset points", ha="left", va="top",
-                fontsize=9, color="#46515e")
 
     if rodape:
         ax.annotate(rodape, xy=(0, 0), xycoords="axes fraction",
-                    xytext=(0, -29), textcoords="offset points",
+                    xytext=(0, -13), textcoords="offset points",
                     fontsize=8, va="top", ha="left", linespacing=1.5)
 
     fig.savefig(png_path, bbox_inches="tight", facecolor="white",

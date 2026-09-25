@@ -2,21 +2,21 @@ name: previsao-regioes
 
 # Coloque em .github/workflows/previsao_regioes.yml
 # Arquivos esperados na raiz do repo: gerar_previsao_regiao.py, estados.kml,
-# mesorregioes.kml, Cidades_principais_137_mesorregioes_Brasil.csv,
-# grupos.json (grupos de pontos, ex.: AMAGGI), logoamaggi.png e (opcional) logo.png.
-# Saída: pasta previsao_regioes/ (o AMAGGI fica em previsao_regioes/AMAGGI/),
-# publicada no ramo "mapas". Esse ramo tem um único commit, trocado a cada
-# execução: os arquivos ficam no repositório, mas o histórico não cresce.
-# O ramo principal fica só com o código. Todo dia às 06:05 (Brasília) roda tudo:
-# Brasil, 27 estados, 137 mesorregiões e todos os grupos do grupos.json.
+# mesorregioes.kml, Cidades_principais_137_mesorregioes_Brasil.csv e
+# (opcional) logo.png. Saída: pasta previsao_regioes/, publicada no ramo
+# "mapas". Esse ramo tem um único commit, trocado a cada execução: os arquivos
+# ficam no repositório, mas o histórico não cresce. O ramo principal fica só
+# com o código. Todo dia às 06:05 (Brasília) roda tudo: Brasil, as 5 regiões
+# (Norte, Nordeste, Centro-Oeste, Sudeste e Sul), 27 estados e 137 mesorregiões,
+# com chuva do dia, chuva acumulada e temperaturas mínima e máxima.
+# (Os mapas da AMAGGI e os de nuvens são feitos só no computador.)
 # Todos os períodos usam America/Sao_Paulo, de 00 h a 00 h do dia seguinte.
 #
 # Uso manual: aba Actions > previsao-regioes > Run workflow.
 #   - "Todas as mesorregiões" já vem marcado -> é só clicar em Run.
 #   - Para gerar só algumas regiões, DESMARQUE e preencha "Regiões".
-#   - Para gerar SÓ o AMAGGI: desmarque e escreva AMAGGI em "Grupos" (com
-#     "Regiões" vazio) ou em "Regiões". São 40 figuras (5 mapas x 8 dias) e os
-#     outros mapas do dia continuam no painel.
+#   - A execução completa (agendada, ou com "Todas" marcado) substitui todos os
+#     mapas do ramo. A parcial (com "Regiões") troca só as áreas geradas.
 #   - Confira os caminhos dos KMLs, inclusive letras maiúsculas/minúsculas.
 #   - As pastas incluem regiao.json e são preparadas antes dos downloads.
 
@@ -32,15 +32,11 @@ on:
         type: string
         default: "0 1 2 3 4 5 6 7"
       vars:
-        description: "Variáveis: chuva tmin tmax nuvem"
-        default: "chuva tmin tmax nuvem"
+        description: "Variáveis: chuva tmin tmax (nuvem também existe)"
+        default: "chuva tmin tmax"
       regioes:
         description: "Só se DESMARCAR acima — regiões (ex.: SP;MG;3105)"
         default: ""
-      grupos:
-        description: "Grupos de pontos do grupos.json (ex.: AMAGGI). todos = todos; vazio = nenhum"
-        type: string
-        default: "todos"
       recortar:
         description: "Recortar o preenchimento ao contorno da região"
         type: boolean
@@ -77,15 +73,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: trazer os mapas publicados (ramo mapas)
-        # Mantém as áreas já publicadas numa execução parcial (ex.: só AMAGGI).
+      - name: trazer os mapas publicados (só na execução parcial)
+        # Completa (agendada ou com "Todas"): começa do zero e o ramo mapas fica
+        # só com os mapas desta execução. Parcial (com "Regiões"): traz os mapas
+        # atuais para as outras áreas continuarem publicadas.
+        env:
+          COMPLETA: ${{ github.event_name == 'schedule' || inputs.todas_meso }}
         run: |
-          if git fetch --depth 1 origin "$RAMO_MAPAS" 2>/dev/null; then
-            rm -rf previsao_regioes
+          rm -rf previsao_regioes
+          if [ "$COMPLETA" = "true" ]; then
+            echo "Execução completa: os mapas do ramo $RAMO_MAPAS serão substituídos por inteiro."
+          elif git fetch --depth 1 origin "$RAMO_MAPAS" 2>/dev/null; then
             git archive FETCH_HEAD previsao_regioes | tar -x
+            # Grupos de pontos (ex.: AMAGGI) são feitos só no computador.
+            python3 - <<'PY'
+          import json, os, shutil
+          for nome in sorted(os.listdir("previsao_regioes")):
+              try:
+                  info = json.load(open(os.path.join("previsao_regioes", nome, "regiao.json"), encoding="utf-8"))
+              except (OSError, ValueError):
+                  continue
+              if isinstance(info, dict) and info.get("tipo") == "grupo":
+                  shutil.rmtree(os.path.join("previsao_regioes", nome))
+                  print(f"Removida a pasta {nome}/ (grupo de pontos, gerado só no computador).")
+          PY
             echo "Mapas atuais trazidos do ramo $RAMO_MAPAS: $(find previsao_regioes -name '*.png' | wc -l) PNGs."
           else
-            echo "Ramo $RAMO_MAPAS ainda não existe; começa com o que estiver na pasta."
+            echo "Ramo $RAMO_MAPAS ainda não existe; começa do zero."
           fi
 
       - uses: actions/setup-python@v5
@@ -123,9 +137,8 @@ jobs:
         env:
           TODAS:   ${{ github.event_name == 'schedule' || inputs.todas_meso }}
           DIAS:    ${{ inputs.dias    || '0 1 2 3 4 5 6 7' }}
-          VARS:    ${{ inputs.vars    || 'chuva tmin tmax nuvem' }}
+          VARS:    ${{ inputs.vars    || 'chuva tmin tmax' }}
           REGIOES: ${{ inputs.regioes || '' }}
-          GRUPOS:  ${{ github.event_name == 'schedule' && 'todos' || inputs.grupos }}
           RECORTAR: ${{ inputs.recortar || false }}
           KML_ESTADOS: ${{ inputs.kml_estados || 'estados.kml' }}
           KML_MESO: ${{ inputs.kml_meso || 'mesorregioes.kml' }}
@@ -137,7 +150,7 @@ jobs:
           # Inclui hoje mesmo se o formulário enviar a configuração antiga (1 a 7).
           # O script elimina dias repetidos antes de calcular e gerar as figuras.
           args=(
-            --todos-estados
+            --todos-estados --regioes-brasil
             --kml "$KML_ESTADOS" "$KML_MESO"
             --fundo "$KML_ESTADOS"
             --kml-meso "$KML_MESO"
@@ -146,31 +159,12 @@ jobs:
             --vars "${vars_args[@]}" --dias 0 "${dias_args[@]}"
             --saida previsao_regioes
           )
-          read -r -a grupos_args <<< "${GRUPOS//[;,]/ }"
-          # AMAGGI digitado em "Regiões" (e nada mais) vale como pedir só esse grupo.
-          if [ "$TODAS" != "true" ] && [ -n "$REGIOES" ] && [ -f grupos.json ] && python - "$REGIOES" <<'PY'
-          import json, sys
-          grupos = {k.casefold() for k in json.load(open("grupos.json", encoding="utf-8"))}
-          itens = [x.strip().casefold() for x in sys.argv[1].split(";") if x.strip()]
-          sys.exit(0 if itens and all(x in grupos for x in itens) else 1)
-          PY
-          then
-            echo "Regiões contém só grupo(s) de pontos: $REGIOES. Gerando só o(s) grupo(s)."
-            read -r -a grupos_args <<< "${REGIOES//[;,]/ }"
-            REGIOES=""
-          fi
-          if [ "${#grupos_args[@]}" -gt 0 ]; then
-            args+=(--grupos grupos.json --grupo "${grupos_args[@]}")
-          fi
           if [ "$TODAS" = "true" ]; then
             args+=(--todas-meso)
           elif [ -n "$REGIOES" ]; then
             args+=(--regioes "$REGIOES")
-          elif [ "${#grupos_args[@]}" -gt 0 ]; then
-            # Só os grupos (ex.: AMAGGI): sem Brasil e sem os 27 estados.
-            args+=(--sem-brasil --sem-estados)
           else
-            echo "::error::Marque Todas as mesorregiões, preencha Regiões ou informe Grupos (ex.: AMAGGI)."
+            echo "::error::Marque Todas as mesorregiões ou preencha Regiões."
             exit 1
           fi
           if [ "$RECORTAR" = "true" ]; then

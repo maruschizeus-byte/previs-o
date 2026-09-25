@@ -331,6 +331,28 @@ def bbox_regiao(regiao):
     return min(xs), min(ys), max(xs), max(ys)
 
 
+def bbox_enquadramento(regiao):
+    """bbox para enquadrar o mapa, ignorando ilhas pequenas e distantes
+    (Trindade no ES, Fernando de Noronha em PE). As ilhas perto da costa entram."""
+    polys = [p for p in regiao["poligonos"] if len(p) >= 3]
+    if len(polys) < 2:
+        return bbox_regiao(regiao)
+    areas = [_area_anel(p) for p in polys]
+    limite = 0.01 * max(areas)
+    grandes = [p for p, a in zip(polys, areas) if a >= limite]
+    x0 = min(x for p in grandes for x, _ in p); x1 = max(x for p in grandes for x, _ in p)
+    y0 = min(y for p in grandes for _, y in p); y1 = max(y for p in grandes for _, y in p)
+    for p, a in zip(polys, areas):
+        if a >= limite:
+            continue
+        px0, px1 = min(x for x, _ in p), max(x for x, _ in p)
+        py0, py1 = min(y for _, y in p), max(y for _, y in p)
+        if px0 > x1 + 1 or px1 < x0 - 1 or py0 > y1 + 1 or py1 < y0 - 1:
+            continue  # ilha distante: fica fora do quadro
+        x0, x1, y0, y1 = min(x0, px0), max(x1, px1), min(y0, py0), max(y1, py1)
+    return x0, y0, x1, y1
+
+
 def bbox_uniao(regioes):
     """bbox que cobre todas as regiões (usado p/ enquadrar a vista Brasil)."""
     xs, ys = [], []
@@ -381,6 +403,8 @@ def uf_sigla(regiao, estados=None):
     """Descobre a sigla da UF de uma região, em cascata:
     1) campo de sigla no KML; 2) nome do estado; 3) código IBGE (2 primeiros
     dígitos); 4) geometria: centro dentro de qual estado do fundo."""
+    if regiao.get("tipo") == "regiao":  # região do Brasil: vários estados
+        return None
     c = regiao.get("campos", {})
     for k in ("sigla_uf", "sigla", "uf", "cd_uf_sigla"):
         v = c.get(k, "").strip()
@@ -455,6 +479,8 @@ def preparar_pastas(alvos, saida, estados):
             "arquivo_kml": regiao["arquivo"] if regiao else None,
             "pasta": sub.replace(os.sep, "/"),
         }
+        if regiao and regiao.get("tipo") == "regiao":
+            registro["ufs"] = regiao.get("ufs") or []
         if regiao and regiao.get("tipo") == "grupo":
             registro["grupo"] = regiao.get("grupo") or regiao["nome"]
             registro["pontos"] = regiao.get("pontos") or []
@@ -607,6 +633,14 @@ def ponto_na_regiao(lon, lat, regiao):
 # =========================================================================
 # GRUPOS DE PONTOS (ex.: AMAGGI) — definidos em grupos.json
 # =========================================================================
+REGIOES_BRASIL = {  # regiões do IBGE, na ordem em que aparecem nas ferramentas
+    "Norte": ["AC", "AP", "AM", "PA", "RO", "RR", "TO"],
+    "Nordeste": ["AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"],
+    "Centro-Oeste": ["DF", "GO", "MT", "MS"],
+    "Sudeste": ["ES", "MG", "RJ", "SP"],
+    "Sul": ["PR", "RS", "SC"],
+}
+
 GRUPOS_PADRAO = "grupos.json"
 POSICOES_LOGO = ("inferior-esquerda", "inferior-direita", "superior-esquerda", "superior-direita")
 
@@ -1115,6 +1149,8 @@ def prefixo_png(regiao, estados, tipo, dias):
     """Prefixo estável por área/produto/horizonte, com caracteres portáveis."""
     if regiao is None:
         alvo = "brasil"
+    elif regiao.get("tipo") == "regiao":
+        alvo = "regiao_" + (re.sub(r"[^a-z0-9]+", "_", _sem_acento(regiao["nome"])).strip("_") or "brasil")
     else:
         uf = uf_sigla(regiao, estados)
         nome = UF_NOMES.get(uf, regiao["nome"]) if regiao.get("tipo") == "estado" else regiao["nome"]
@@ -1211,6 +1247,47 @@ def _add_logo(fig, ax, caminho, pos, escala, alpha, fundo=True):
     return ab
 
 
+def _cubica_eixo(v, fator, eixo):
+    """Catmull-Rom ao longo de um eixo: passa exatamente pelos pontos da grade."""
+    n = v.shape[eixo]
+    if n < 2 or fator <= 1:
+        return v
+    pos = np.arange((n - 1) * fator + 1) / fator
+    i = np.minimum(pos.astype(int), n - 2)
+    t = (pos - i).astype(np.float32)
+    forma = [1] * v.ndim
+    forma[eixo] = t.size
+    t = t.reshape(forma)
+    pega = lambda k: np.take(v, np.clip(i + k, 0, n - 1), axis=eixo)
+    p0, p1, p2, p3 = pega(-1), pega(0), pega(1), pega(2)
+    return 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t ** 2
+                  + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3)
+
+
+def refinar_grade(lons, lats, dados, extent, px_largura=1000, px_altura=880):
+    """Interpola o campo para uma grade mais fina só para desenhar.
+
+    A grade do ECMWF tem 0,25° (~28 km); num mapa de mesorregião cada célula
+    ocupa dezenas de pixels e as faixas de cor saem em degraus. A interpolação
+    cúbica passa pelos valores do modelo (não cria nem apaga máximos) e deixa
+    cada célula com ~4 px. É só visual: o detalhe continua sendo o do modelo.
+    """
+    if len(lons) < 2 or len(lats) < 2:
+        return lons, lats, dados
+    largura = (extent[1] - extent[0]) if extent else (lons.max() - lons.min())
+    altura = (extent[3] - extent[2]) if extent else (lats.max() - lats.min())
+    px_celula = max(px_largura * abs(lons[1] - lons[0]) / max(largura, 1e-6),
+                    px_altura * abs(lats[1] - lats[0]) / max(altura, 1e-6))
+    fator = int(min(16, max(1, math.ceil(px_celula / 4))))
+    if fator == 1:
+        return lons, lats, dados
+    fino = _cubica_eixo(_cubica_eixo(np.asarray(dados, dtype=np.float32), fator, 1), fator, 0)
+    fino = np.clip(fino, float(np.min(dados)), float(np.max(dados)))  # sem valores fora do campo
+    novos_lons = np.linspace(lons[0], lons[-1], (len(lons) - 1) * fator + 1)
+    novas_lats = np.linspace(lats[0], lats[-1], (len(lats) - 1) * fator + 1)
+    return novos_lons, novas_lats, fino
+
+
 def _sobreposicao(a, b):
     w = min(a.x1, b.x1) - max(a.x0, b.x0)
     h = min(a.y1, b.y1) - max(a.y0, b.y0)
@@ -1266,7 +1343,7 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
            cor_acima=None, cor_abaixo=None, extend="max",
            extent=None, regiao=None, fundo=None, recortar=False, cidades=None,
            logo=None, logo_pos="inferior-direita", logo_escala=0.16, logo_alpha=1.0,
-           logo_fundo=True, rodape=""):
+           logo_fundo=True, rodape="", suavizar=True):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -1287,6 +1364,8 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
             meio = int(np.argmin(np.abs(lats - (extent[2] + extent[3]) / 2)))
             iy0, iy1 = max(0, meio - 1), min(len(lats), meio + 2)
         lons, lats, dados = lons[ix0:ix1], lats[iy0:iy1], dados[iy0:iy1, ix0:ix1]
+    if suavizar:
+        lons, lats, dados = refinar_grade(lons, lats, dados, extent)
     levels, cmap, norm, ticks = construir_colormap(faixas, cor_acima, cor_abaixo)
     lon2d, lat2d = np.meshgrid(lons, lats)
 
@@ -1323,6 +1402,12 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
         for poly in regiao["poligonos"]:
             xy = np.array(poly)
             ax.plot(xy[:, 0], xy[:, 1], color="black", linewidth=1.6)
+    if regiao is not None and regiao.get("tipo") == "regiao":  # sigla de cada estado
+        import matplotlib.patheffects as pe
+        for sigla, lon, lat in regiao.get("rotulos") or []:
+            t = ax.annotate(sigla, (lon, lat), ha="center", va="center", fontsize=12,
+                            fontweight="bold", color="#26323a", zorder=6)
+            t.set_path_effects([pe.withStroke(linewidth=2.6, foreground="white")])
 
     # pontos de cidade (referência p/ localizar) — sempre por cima do resto
     if cidades:
@@ -1470,9 +1555,11 @@ def escrever_catalogo(saida, alvos, estados, hoje, dias_dados, rodada, gerado_em
             nome = UF_NOMES.get(uf, regiao["nome"]) if regiao["tipo"] == "estado" else \
                 " ".join(regiao["nome"].split())
             # O painel conhece brasil/estado/mesorregiao: o grupo entra como área da UF.
-            item = {"id": pasta, "nome": nome,
-                    "tipo": "mesorregiao" if regiao["tipo"] == "grupo" else regiao["tipo"],
+            tipo_painel = {"grupo": "mesorregiao", "regiao": "brasil"}.get(regiao["tipo"], regiao["tipo"])
+            item = {"id": pasta, "nome": nome, "tipo": tipo_painel,
                     "rotulo": nome_no_mapa(regiao, estados)}
+            if regiao["tipo"] == "regiao":
+                item["regiao_brasil"] = True
             if regiao["tipo"] == "grupo":
                 item["grupo"] = True
             if uf:
@@ -1571,6 +1658,8 @@ def main():
     ap.add_argument("--saida", default="saida_previsao", help="pasta de saída")
     ap.add_argument("--margem", type=float, default=1.0,
                     help="folga em graus ao redor da região no recorte da imagem")
+    ap.add_argument("--sem-suavizar", action="store_true",
+                    help="desenha a grade crua de 0,25° (por padrão o campo é interpolado só para ficar menos pixelado)")
     ap.add_argument("--recortar", action="store_true",
                     help="limita o preenchimento ao polígono da região")
     ap.add_argument("--todas-meso", action="store_true",
@@ -1578,6 +1667,9 @@ def main():
                          "em pastas <saida>/<UF>/<mesorregião>/")
     ap.add_argument("--todos-estados", action="store_true", default=True,
                     help="compatibilidade: os estados são sempre gerados em <saida>/<UF>/")
+    ap.add_argument("--regioes-brasil", action="store_true",
+                    help="gera também as 5 regiões do Brasil (Norte, Nordeste, Centro-Oeste, "
+                         "Sudeste e Sul) em <saida>/regioes/<região>/")
     ap.add_argument("--sem-estados", action="store_true",
                     help="NÃO gerar os 27 estados (útil para rodar só um grupo, ex.: AMAGGI)")
     ap.add_argument("--grupo", nargs="+", default=None,
@@ -1723,7 +1815,7 @@ def main():
     alvos = []  # (subdir, regiao|None, extent|None, cidades)
 
     def _alvo_de_regiao(r):
-        lo0, la0, lo1, la1 = bbox_regiao(r)
+        lo0, la0, lo1, la1 = bbox_enquadramento(r)
         m = args.margem
         ext = (lo0 - m, lo1 + m, la0 - m, la1 + m)
         cids = list(cidades_cli)
@@ -1737,14 +1829,36 @@ def main():
     if not args.sem_brasil:
         # enquadra o Brasil no bbox dos estados (fundo) + margem, em vez do
         # domínio inteiro que é baixado (que vai muito além do Brasil).
-        bb = bbox_uniao(fundo_regioes or regioes)
+        caixas = [bbox_enquadramento(r) for r in (fundo_regioes or regioes)]
         ext_br = None
-        if bb:
-            lo0, la0, lo1, la1 = bb
+        if caixas:
+            lo0, la0 = min(c[0] for c in caixas), min(c[1] for c in caixas)
+            lo1, la1 = max(c[2] for c in caixas), max(c[3] for c in caixas)
             mb = min(max(args.margem, 0.15), 0.5)
             ext_br = (lo0 - mb, lo1 + mb, la0 - mb, la1 + mb)
         alvos.append(("brasil", None, ext_br, list(cidades_cli)))
         print("Alvo: Brasil inteiro (sempre)")
+
+    if args.regioes_brasil:
+        por_uf = {uf_sigla(r, fundo_regioes): r for r in fundo_regioes}
+        for nome_reg, ufs in REGIOES_BRASIL.items():
+            presentes = [u for u in ufs if u in por_uf]
+            if len(presentes) < len(ufs):
+                print(f"  AVISO: região {nome_reg}: faltam no KML de estados {', '.join(sorted(set(ufs) - set(presentes)))}")
+            if not presentes:
+                continue
+            estados_reg = [por_uf[u] for u in presentes]
+            caixas = [bbox_enquadramento(e) for e in estados_reg]
+            m = args.margem
+            ext_reg = (min(c[0] for c in caixas) - m, max(c[2] for c in caixas) + m,
+                       min(c[1] for c in caixas) - m, max(c[3] for c in caixas) + m)
+            reg = {"nome": nome_reg, "tipo": "regiao", "ufs": presentes, "campos": {}, "chaves": [],
+                   "arquivo": estados_reg[0]["arquivo"], "nome_mapa": f"Região {nome_reg}",
+                   "poligonos": [p for e in estados_reg for p in e["poligonos"]],
+                   "rotulos": [(u, *ponto_para_rotulo(por_uf[u])) for u in presentes]}
+            sub_reg = os.path.join("regioes", _pasta_segura(nome_reg))
+            alvos.append((sub_reg, reg, ext_reg, []))
+            print(f"Alvo: Região {nome_reg} -> {sub_reg}  ({', '.join(presentes)})")
 
     for pedido in pedidos:
         r = selecionar_regiao(regioes, pedido)
@@ -1820,7 +1934,7 @@ def main():
         if g["mapas_mesorregioes"]:
             for meso in mesos_uf:
                 nome_meso = re.sub(rf"\s*(?:[-–—/]\s*{uf}|\({uf}\))$", "", " ".join(meso["nome"].split()), flags=re.I)
-                lo0, la0, lo1, la1 = bbox_regiao(meso)
+                lo0, la0, lo1, la1 = bbox_enquadramento(meso)
                 ext_m = (lo0 - m, lo1 + m, la0 - m, la1 + m)
                 # só os pontos do grupo que ficam dentro desta mesorregião
                 pontos_m = [p for p in g["pontos"] if ponto_na_regiao(p["lon"], p["lat"], meso)]
@@ -1891,7 +2005,7 @@ def main():
     for _, r, _, _ in alvos:
         t = "brasil" if r is None else r["tipo"]
         por_tipo[t] = por_tipo.get(t, 0) + 1
-    rotulos_tipo = {"brasil": "Brasil", "estado": "estados", "mesorregiao": "mesorregiões", "grupo": "grupos"}
+    rotulos_tipo = {"brasil": "Brasil", "regiao": "regiões", "estado": "estados", "mesorregiao": "mesorregiões", "grupo": "grupos"}
     partes = ", ".join(f"{rotulos_tipo.get(t, t)} {n}" for t, n in por_tipo.items())
     mapas_dia = len(next(iter(dias_dados.values()))["produtos"]) if dias_dados else 0
     print(f"A gerar {total_esperado} figura(s): {len(alvos)} áreas ({partes}) × {mapas_dia} mapas "
@@ -1913,7 +2027,8 @@ def main():
                        recortar=args.recortar, cidades=cids,
                        logo=logo, logo_pos=args.logo_pos,
                        logo_escala=args.logo_escala, logo_alpha=args.logo_alpha,
-                       logo_fundo=not args.logo_sem_fundo, rodape=rodape)
+                       logo_fundo=not args.logo_sem_fundo, rodape=rodape,
+                       suavizar=not args.sem_suavizar)
                 substituicoes.append((outdir, prefixo_png(regiao, fundo_regioes, tipo, dias),
                                        f"ecmwf_{tipo}_{dias}d.png", arquivo_png))
                 total += 1

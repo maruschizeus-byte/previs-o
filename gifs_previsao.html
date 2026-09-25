@@ -240,6 +240,7 @@ const RE_LEGADO = /^ecmwf_(chuva_dia|chuva_acumulado|tmin|tmax|nuvem)_(\d{1,2})d
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 const SEMANA = ['dom','seg','ter','qua','qui','sex','sáb'];
 const SEM_DATA = 'sem-data';
+const ORDEM_REGIOES = ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
 
 const semAcento = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const slug = s => semAcento(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -300,6 +301,10 @@ async function nomearRegioes(regioes, infos) {
     const segUF = segs.find(s => UF_NOMES[s]);
     if (/^brasil$/i.test(r.alvo) || (info && info.tipo === 'brasil') || (!r.alvo && /^brasil$/i.test(segs[segs.length - 1] || ''))) {
       Object.assign(r, {tipo: 'brasil', uf: null, nome: 'Brasil'});
+    } else if ((info && info.tipo === 'regiao' && info.nome) || /^regiao_/i.test(r.alvo)) {  // Norte, Sul...
+      const nome = info && info.nome ? String(info.nome).trim()
+        : ORDEM_REGIOES.find(n => slug(n) === r.alvo.replace(/^regiao_/i, '').toLowerCase()) || r.alvo.replace(/^regiao_/i, '');
+      Object.assign(r, {tipo: 'regiao', uf: null, nome});
     } else if (info && info.tipo === 'grupo' && info.nome) {  // grupo de pontos (ex.: AMAGGI)
       const nome = String(info.nome).replace(/\s+/g, ' ').trim();  // mapa por mesorregião: "AMAGGI — NORTE ..."
       Object.assign(r, {tipo: 'grupo', uf: UF_NOMES[info.uf] ? info.uf : null, nome, subgrupo: !!(info.grupo && info.grupo !== nome)});
@@ -312,7 +317,7 @@ async function nomearRegioes(regioes, infos) {
         (segs.length ? segs[segs.length - 1] : resto.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()));
       Object.assign(r, {tipo, uf, nome: String(nome).replace(/\s+/g, ' ').trim()});
     }
-    r.rotulo = r.tipo === 'brasil' ? 'Brasil' : r.tipo === 'grupo' ? (r.subgrupo ? r.nome : r.nome + (r.uf ? ' — ' + UF_NOMES[r.uf] : '')) : r.tipo === 'estado' ? r.nome + (r.uf ? ' — estado inteiro' : '') : r.nome + (r.uf ? ' — ' + r.uf : '');
+    r.rotulo = r.tipo === 'brasil' ? 'Brasil' : r.tipo === 'regiao' ? 'Região ' + r.nome : r.tipo === 'grupo' ? (r.subgrupo ? r.nome : r.nome + (r.uf ? ' — ' + UF_NOMES[r.uf] : '')) : r.tipo === 'estado' ? r.nome + (r.uf ? ' — estado inteiro' : '') : r.nome + (r.uf ? ' — ' + r.uf : '');
     r.prefixo = r.alvo || slug(r.rel || r.nome) || 'area';
   }
   return regioes;
@@ -443,10 +448,11 @@ function montarEstados(preferido) {
   const lista = regioesDaBase(), ufs = new Map();
   for (const r of lista) if (r.uf && r.tipo !== 'grupo') ufs.set(r.uf, UF_NOMES[r.uf]);
   const sel = $('sel-estado'); sel.replaceChildren();
-  if (lista.some(r => r.tipo === 'brasil')) sel.add(opcao('BR', 'Brasil inteiro'));
+  if (lista.some(r => r.tipo === 'brasil' || r.tipo === 'regiao'))
+    sel.add(opcao('BR', lista.some(r => r.tipo === 'regiao') ? 'Brasil e regiões' : 'Brasil inteiro'));
   if (lista.some(r => r.tipo === 'grupo')) sel.add(opcao('GRUPOS', 'Grupos de pontos'));
   for (const [uf, nome] of [...ufs].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'))) sel.add(opcao(uf, nome + ' (' + uf + ')'));
-  if (lista.some(r => !r.uf && r.tipo !== 'brasil' && r.tipo !== 'grupo')) sel.add(opcao('--', 'Sem estado identificado'));
+  if (lista.some(r => !r.uf && !['brasil', 'regiao', 'grupo'].includes(r.tipo))) sel.add(opcao('--', 'Sem estado identificado'));
   const valores = [...sel.options].map(o => o.value);
   sel.value = valores.includes(preferido) ? preferido : valores[0];
   sel.disabled = valores.length < 2;
@@ -462,20 +468,21 @@ function montarEstados(preferido) {
 }
 
 function areasDoEstado(uf) {
-  const lista = regioesDaBase().filter(r => uf === 'BR' ? r.tipo === 'brasil' : uf === 'GRUPOS' ? r.tipo === 'grupo'
-    : r.tipo === 'grupo' ? false : uf === '--' ? !r.uf && r.tipo !== 'brasil' : r.uf === uf);
-  return lista.sort((a, b) => (a.tipo === 'estado' ? -1 : b.tipo === 'estado' ? 1 : a.nome.localeCompare(b.nome, 'pt-BR')));
+  const lista = regioesDaBase().filter(r => uf === 'BR' ? r.tipo === 'brasil' || r.tipo === 'regiao' : uf === 'GRUPOS' ? r.tipo === 'grupo'
+    : ['grupo', 'regiao'].includes(r.tipo) ? false : uf === '--' ? !r.uf && r.tipo !== 'brasil' : r.uf === uf);
+  const peso = r => r.tipo === 'brasil' || r.tipo === 'estado' ? -1 : r.tipo === 'regiao' ? ORDEM_REGIOES.indexOf(r.nome) + 1 || 99 : 0;
+  return lista.sort((a, b) => peso(a) - peso(b) || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 function montarAreas(preferida) {
   const uf = $('sel-estado').value, lista = areasDoEstado(uf), sel = $('sel-area');
   sel.replaceChildren();
-  for (const r of lista) sel.add(opcao(r.chave, r.tipo === 'brasil' ? 'Brasil inteiro' : r.tipo === 'estado' ? 'Estado inteiro'
+  for (const r of lista) sel.add(opcao(r.chave, r.tipo === 'brasil' ? 'Brasil inteiro' : r.tipo === 'regiao' ? 'Região ' + r.nome : r.tipo === 'estado' ? 'Estado inteiro'
     : r.tipo === 'grupo' ? (r.subgrupo ? r.nome : r.nome + (r.uf ? ' (' + UF_NOMES[r.uf] + ')' : '')) : r.nome));
   est.regiao = lista.find(r => r.chave === preferida) || lista[0] || null;
   if (est.regiao) sel.value = est.regiao.chave;
   sel.disabled = lista.length < 2;
-  $('esc-estado').textContent = uf === 'BR' ? 'Só o Brasil inteiro' : uf === 'GRUPOS' ? `Todos os grupos de pontos (${lista.length})`
+  $('esc-estado').textContent = uf === 'BR' ? (lista.length > 1 ? `Brasil e regiões (${lista.length})` : 'Só o Brasil inteiro') : uf === 'GRUPOS' ? `Todos os grupos de pontos (${lista.length})`
     : `Todas de ${UF_NOMES[uf] || 'sem estado'} (${lista.length})`;
   montarVariaveis(est.tipo);
 }

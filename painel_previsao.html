@@ -181,7 +181,7 @@ select{width:100%;background:#fff;border:1px solid #d5dfd9;border-radius:8px;min
     elements.region.replaceChildren();
     const list=catalog.regioes.filter(r=>uf==='BR'?r.tipo==='brasil':r.uf===uf)
       .sort((a,b)=>(a.tipo==='estado'?-1:b.tipo==='estado'?1:a.nome.localeCompare(b.nome,'pt-BR')));
-    for(const r of list) elements.region.add(option(r.id,r.tipo==='brasil'?'Brasil inteiro':r.tipo==='estado'?'Estado inteiro':r.nome));
+    for(const r of list) elements.region.add(option(r.id,r.tipo==='brasil'?(r.regiao_brasil?(r.rotulo||r.nome):'Brasil inteiro'):r.tipo==='estado'?'Estado inteiro':r.nome));
     currentRegion=list.find(r=>r.id===preferred)||list[0];
     if(!currentRegion) throw new Error('Esta área ainda não tem mapas disponíveis.');
     elements.region.value=currentRegion.id;elements.region.disabled=list.length<2;
@@ -317,7 +317,7 @@ select{width:100%;background:#fff;border:1px solid #d5dfd9;border-radius:8px;min
     const initial=catalog.regioes.find(r=>r.id===requested)||catalog.regioes.find(r=>r.tipo==='brasil')||catalog.regioes[0];
     const states=new Map();for(const r of catalog.regioes)if(r.uf)states.set(r.uf,r.estado||r.uf);
     elements.state.replaceChildren();
-    if(catalog.regioes.some(r=>r.tipo==='brasil'))elements.state.add(option('BR','Brasil inteiro'));
+    if(catalog.regioes.some(r=>r.tipo==='brasil'))elements.state.add(option('BR',catalog.regioes.some(r=>r.regiao_brasil)?'Brasil e regiões':'Brasil inteiro'));
     for(const [uf,name] of [...states].sort((a,b)=>a[1].localeCompare(b[1],'pt-BR')))elements.state.add(option(uf,name+' — '+uf));
     elements.state.value=initial.tipo==='brasil'?'BR':initial.uf;elements.state.disabled=elements.state.options.length<2;
     configureRegions(elements.state.value,initial.id);configureVariables(q.get('variavel')||'chuva_dia');

@@ -1288,6 +1288,34 @@ def refinar_grade(lons, lats, dados, extent, px_largura=1000, px_altura=880):
     return novos_lons, novas_lats, fino
 
 
+def _arrays_poligonos(regiao):
+    """Polígonos como arrays numpy com a caixa de cada um (calculado uma vez por região)."""
+    cache = regiao.get("_arrays")
+    if cache is None:
+        cache = []
+        for poly in regiao["poligonos"]:
+            xy = np.asarray(poly, dtype=float)
+            if len(xy) >= 2:
+                cache.append((xy, xy[:, 0].min(), xy[:, 0].max(), xy[:, 1].min(), xy[:, 1].max()))
+        regiao["_arrays"] = cache
+    return cache
+
+
+def _desenhar_contornos(ax, regioes, extent, tracejado=False, **estilo):
+    """Todos os contornos numa só coleção de linhas, só com os polígonos que
+    aparecem no quadro. Antes era uma linha por polígono (~260 por mapa)."""
+    from matplotlib.collections import LineCollection
+    segs = []
+    for r in regioes:
+        for xy, x0, x1, y0, y1 in _arrays_poligonos(r):
+            if extent is None or not (x1 < extent[0] or x0 > extent[1] or y1 < extent[2] or y0 > extent[3]):
+                segs.append(xy)
+    if segs:
+        ax.add_collection(LineCollection(segs, zorder=2, joinstyle="round",
+                                         capstyle="butt" if tracejado else "projecting", **estilo),
+                          autolim=False)
+
+
 def _sobreposicao(a, b):
     w = min(a.x1, b.x1) - max(a.x0, b.x0)
     h = min(a.y1, b.y1) - max(a.y0, b.y0)
@@ -1387,21 +1415,14 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     # fundo: contorno fino dos ESTADOS (contexto). As outras mesorregiões não
     # entram aqui — só o fundo de estados e a região escolhida em destaque.
     if fundo:
-        for r in fundo:
-            for poly in r["poligonos"]:
-                xy = np.array(poly)
-                ax.plot(xy[:, 0], xy[:, 1], color="black", linewidth=0.5, alpha=0.55)
+        _desenhar_contornos(ax, fundo, extent, colors="black", linewidths=0.5, alpha=0.55)
     # Grupo de pontos (ex.: AMAGGI): mesorregiões do estado em tracejado.
     grupo = regiao if regiao is not None and regiao.get("tipo") == "grupo" else None
-    for r in (grupo or {}).get("contornos") or []:
-        for poly in r["poligonos"]:
-            xy = np.array(poly)
-            ax.plot(xy[:, 0], xy[:, 1], color="#111111", linewidth=1.15, alpha=0.9,
-                    linestyle=(0, (6, 3)))
+    if grupo and grupo.get("contornos"):
+        _desenhar_contornos(ax, grupo["contornos"], extent, tracejado=True, colors="#111111",
+                            linewidths=1.15, alpha=0.9, linestyles=[(0, (6, 3))])
     if regiao is not None:
-        for poly in regiao["poligonos"]:
-            xy = np.array(poly)
-            ax.plot(xy[:, 0], xy[:, 1], color="black", linewidth=1.6)
+        _desenhar_contornos(ax, [regiao], extent, colors="black", linewidths=1.6)
     if regiao is not None and regiao.get("tipo") == "regiao":  # sigla de cada estado
         import matplotlib.patheffects as pe
         for sigla, lon, lat in regiao.get("rotulos") or []:
@@ -1613,6 +1634,45 @@ def escrever_catalogo(saida, alvos, estados, hoje, dias_dados, rodada, gerado_em
 
 
 # =========================================================================
+# GERAÇÃO EM PARALELO
+# =========================================================================
+_TRABALHO = {}
+
+
+def numero_processos(pedido, tarefas):
+    """0 = automático: todos os núcleos no GitHub; no computador, deixa um livre."""
+    if pedido and pedido > 0:
+        n = pedido
+    else:
+        n = os.cpu_count() or 1
+        if not os.environ.get("GITHUB_ACTIONS"):
+            n -= 1
+    return max(1, min(n, 12, tarefas))
+
+
+def _iniciar_trabalho(estado):
+    """Roda uma vez em cada processo: guarda dados, geografia e opções."""
+    global _TRABALHO
+    import matplotlib
+    matplotlib.use("Agg")
+    _TRABALHO = estado
+
+
+def _gerar_figura(tarefa):
+    dias, i_alvo, i_prod = tarefa
+    e = _TRABALHO
+    d = e["dias_dados"][dias]
+    subdir, regiao, extent, cids = e["alvos"][i_alvo]
+    tipo, campo, titulo, per, faixas, c_a, c_b, ext_cb, rodape = d["produtos"][i_prod]
+    outdir = os.path.join(e["saida"], subdir)
+    arquivo_png = nome_png(regiao, e["fundo"], tipo, dias, e["hoje"])
+    plotar(d["lons"], d["lats"], campo, titulo, per, os.path.join(outdir, arquivo_png), faixas,
+           cor_acima=c_a, cor_abaixo=c_b, extend=ext_cb, extent=extent, regiao=regiao,
+           fundo=e["fundo"], cidades=cids, rodape=rodape, **e["opcoes"])
+    return outdir, prefixo_png(regiao, e["fundo"], tipo, dias), f"ecmwf_{tipo}_{dias}d.png", arquivo_png
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 VARS_VALIDAS = ["chuva", "tmin", "tmax", "nuvem"]
@@ -1658,6 +1718,9 @@ def main():
     ap.add_argument("--saida", default="saida_previsao", help="pasta de saída")
     ap.add_argument("--margem", type=float, default=1.0,
                     help="folga em graus ao redor da região no recorte da imagem")
+    ap.add_argument("--processos", type=int, default=0,
+                    help="mapas gerados ao mesmo tempo (padrão 0 = automático: um por núcleo; "
+                         "no computador deixa um núcleo livre). 1 = um de cada vez")
     ap.add_argument("--sem-suavizar", action="store_true",
                     help="desenha a grade crua de 0,25° (por padrão o campo é interpolado só para ficar menos pixelado)")
     ap.add_argument("--recortar", action="store_true",
@@ -2013,31 +2076,42 @@ def main():
     inicio = time.time()
     total = 0
     substituicoes = []
-    for dias in sorted(dias_dados):
-        d = dias_dados[dias]
-        lons, lats, produtos = d["lons"], d["lats"], d["produtos"]
-        for subdir, regiao, extent, cids in alvos:
-            outdir = os.path.join(args.saida, subdir)
-            for tipo, campo, titulo, per, faixas, c_a, c_b, ext_cb, rodape in produtos:
-                arquivo_png = nome_png(regiao, fundo_regioes, tipo, dias, hoje)
-                png = os.path.join(outdir, arquivo_png)
-                plotar(lons, lats, campo, titulo, per, png, faixas,
-                       cor_acima=c_a, cor_abaixo=c_b, extend=ext_cb,
-                       extent=extent, regiao=regiao, fundo=fundo_regioes,
-                       recortar=args.recortar, cidades=cids,
-                       logo=logo, logo_pos=args.logo_pos,
-                       logo_escala=args.logo_escala, logo_alpha=args.logo_alpha,
-                       logo_fundo=not args.logo_sem_fundo, rodape=rodape,
-                       suavizar=not args.sem_suavizar)
-                substituicoes.append((outdir, prefixo_png(regiao, fundo_regioes, tipo, dias),
-                                       f"ecmwf_{tipo}_{dias}d.png", arquivo_png))
-                total += 1
-                if total % 50 == 0 or total == total_esperado:
-                    seg = time.time() - inicio
-                    taxa = total / seg if seg else 0
-                    restam = (total_esperado - total) / taxa if taxa else 0
-                    print(f"    {total}/{total_esperado} figuras | {seg:.0f}s | ~{restam:.0f}s restantes")
-        print(f"  dia {dias}d concluído")
+    tarefas = [(dias, i, j) for dias in sorted(dias_dados) for i in range(len(alvos))
+               for j in range(len(dias_dados[dias]["produtos"]))]
+    por_dia = {dias: len(alvos) * len(dias_dados[dias]["produtos"]) for dias in dias_dados}
+    estado = {"alvos": alvos, "fundo": fundo_regioes, "dias_dados": dias_dados, "saida": args.saida,
+              "hoje": hoje, "opcoes": dict(recortar=args.recortar, logo=logo, logo_pos=args.logo_pos,
+                                           logo_escala=args.logo_escala, logo_alpha=args.logo_alpha,
+                                           logo_fundo=not args.logo_sem_fundo, suavizar=not args.sem_suavizar)}
+    n_proc = numero_processos(args.processos, len(tarefas))
+    print(f"Mapas gerados ao mesmo tempo: {n_proc} (núcleos do processador: {os.cpu_count() or 1})")
+
+    def _registrar(tarefa, resultado):
+        nonlocal total
+        substituicoes.append(resultado)
+        total += 1
+        por_dia[tarefa[0]] -= 1
+        if total % 50 == 0 or total == total_esperado:
+            seg = time.time() - inicio
+            taxa = total / seg if seg else 0
+            restam = (total_esperado - total) / taxa if taxa else 0
+            print(f"    {total}/{total_esperado} figuras | {seg:.0f}s | ~{restam:.0f}s restantes")
+        if por_dia[tarefa[0]] == 0:
+            print(f"  dia {tarefa[0]}d concluído")
+
+    if n_proc == 1:
+        _iniciar_trabalho(estado)
+        for tarefa in tarefas:
+            _registrar(tarefa, _gerar_figura(tarefa))
+    else:
+        from concurrent.futures import ProcessPoolExecutor
+        try:
+            with ProcessPoolExecutor(max_workers=n_proc, initializer=_iniciar_trabalho,
+                                     initargs=(estado,)) as pool:
+                for tarefa, resultado in zip(tarefas, pool.map(_gerar_figura, tarefas, chunksize=4)):
+                    _registrar(tarefa, resultado)
+        except Exception as e:
+            sys.exit(f"ERRO ao gerar as figuras: {type(e).__name__}: {e}")
     if grupos:
         remover_grupos_orfaos(args.saida, grupos, {sub for sub, r, _, _ in alvos if r and r.get("tipo") == "grupo"})
     # Catálogo primeiro: aponta só para os mapas novos, que já existem.

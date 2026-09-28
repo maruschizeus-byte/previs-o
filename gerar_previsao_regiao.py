@@ -1865,6 +1865,18 @@ def main():
     pedidos = list(args.regiao)
     if args.regioes:
         pedidos += [p.strip() for p in args.regioes.split(";") if p.strip()]
+    # Áreas escolhidas pela pasta, como a ferramenta manda: "pasta:SP/Campinas",
+    # "pasta:SP", "pasta:regioes/Sul" ou "pasta:brasil". Sem ambiguidade de nome.
+    pastas_escolhidas, regioes_escolhidas = [], []
+    for p in [x for x in pedidos if x.lower().startswith("pasta:")]:
+        pedidos.remove(p)
+        v = unicodedata.normalize("NFC", p[6:].strip().strip("/"))
+        if v.casefold() == "brasil":
+            args.sem_brasil = False
+        elif v.casefold().startswith("regioes/"):
+            regioes_escolhidas.append(v.split("/", 1)[1].casefold())
+        elif v:
+            pastas_escolhidas.append(v)
     pedidos_grupo = [g.strip() for item in (args.grupo or []) for g in re.split(r"[;,\s]+", item) if g.strip()]
     if all(g.casefold() == "nenhum" for g in pedidos_grupo):
         pedidos_grupo = []
@@ -1897,7 +1909,8 @@ def main():
             print(f"'{'; '.join(em_regioes)}' é grupo de pontos: gerando como grupo, não como região.")
             pedidos = [p for p in pedidos if p.strip().casefold() not in nomes_grupo]
             pedidos_grupo += [p.strip() for p in em_regioes]
-    if not pedidos and args.sem_brasil and not args.todas_meso and args.sem_estados and not pedidos_grupo and not args.ponto:
+    if (not pedidos and args.sem_brasil and not args.todas_meso and args.sem_estados and not pedidos_grupo
+            and not args.ponto and not pastas_escolhidas and not regioes_escolhidas):
         sys.exit("Nada a gerar: sem regiões, grupos, Brasil, estados ou mesorregiões.")
 
     try:
@@ -1931,8 +1944,8 @@ def main():
             except (ValueError, OSError) as e:
                 sys.exit(f"ERRO nas cidades: {e}")
             print(f"Cidades: {len(cidades_arquivo)} ponto(s) de {caminho_cidades}")
-        elif args.todas_meso or any(r["tipo"] == "mesorregiao" for r in
-                                  (selecionar_regiao(regioes, p, avisar=False) for p in pedidos) if r):
+        elif args.todas_meso or any("/" in p for p in pastas_escolhidas) or any(
+                r["tipo"] == "mesorregiao" for r in (selecionar_regiao(regioes, p, avisar=False) for p in pedidos) if r):
             sys.exit(f"ERRO: arquivo de cidades não encontrado: {args.cidades}. "
                      "Coloque o CSV de cidades no repositório ou ajuste --cidades.")
     cidades_cli = []
@@ -1990,11 +2003,13 @@ def main():
             mb = min(max(args.margem, 0.15), 0.5)
             ext_br = (lo0 - mb, lo1 + mb, la0 - mb, la1 + mb)
         alvos.append(("brasil", None, ext_br, list(cidades_cli)))
-        print("Alvo: Brasil inteiro (sempre)")
+        print("Alvo: Brasil inteiro")
 
-    if args.regioes_brasil:
+    if args.regioes_brasil or regioes_escolhidas:
         por_uf = {uf_sigla(r, fundo_regioes): r for r in fundo_regioes}
         for nome_reg, ufs in REGIOES_BRASIL.items():
+            if not args.regioes_brasil and _pasta_segura(nome_reg).casefold() not in regioes_escolhidas:
+                continue
             presentes = [u for u in ufs if u in por_uf]
             if len(presentes) < len(ufs):
                 print(f"  AVISO: região {nome_reg}: faltam no KML de estados {', '.join(sorted(set(ufs) - set(presentes)))}")
@@ -2022,6 +2037,19 @@ def main():
         sub, r, ext, cids = _alvo_de_regiao(r)
         alvos.append((sub, r, ext, cids))
         print(f"Alvo: {r['nome']} -> {sub}  cidades={len(cids)}")
+
+    if pastas_escolhidas:  # estado ou mesorregião pela pasta em que os mapas ficam
+        por_pasta = {}
+        for r in regioes:
+            por_pasta.setdefault(_sem_acento(subdir_do_alvo(r, fundo_regioes).replace(os.sep, "/")), r)
+        for v in pastas_escolhidas:
+            r = por_pasta.get(_sem_acento(v))
+            if r is None:
+                print(f"  AVISO: nenhuma área gera a pasta '{v}'; pulando.")
+                continue
+            sub, r, ext, cids = _alvo_de_regiao(r)
+            alvos.append((sub, r, ext, cids))
+            print(f"Alvo: {r['nome']} -> {sub}  cidades={len(cids)}")
 
     if args.todos_estados and not args.sem_estados:
         print(f"Todos os estados: {len(fundo_regioes)}")

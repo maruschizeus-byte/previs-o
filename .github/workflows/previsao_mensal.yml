@@ -1,0 +1,115 @@
+name: previsao-mensal
+
+# Coloque em .github/workflows/previsao_mensal.yml.
+# Previsão dos próximos 3 meses (tendência) e anomalia prevista, por área:
+# Brasil, 5 regiões e 27 estados. Fonte: ECMWF SEAS5 via Copernicus (C3S).
+# Só roda quando você manda: Actions > previsao-mensal > Run workflow.
+# O Copernicus publica a rodada nova por volta do dia 13; antes disso, usa a do mês anterior.
+#
+# Precisa do segredo CDSAPI_KEY: Settings > Secrets and variables > Actions >
+# New repository secret, com o "API Token" do seu perfil em cds.climate.copernicus.eu.
+# Arquivos na raiz do repo: gerar_previsao_mensal.py, gerar_previsao_regiao.py,
+# estados.kml e (opcional) logo.png.
+#
+# Os mapas vão para o ramo "mensal" (um único commit, trocado a cada execução)
+# e ficam também no .zip em Artifacts por 31 dias.
+
+run-name: "Previsão dos próximos 3 meses"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mes_inicio:
+        description: "Primeiro dos 3 meses (AAAA-MM). Vazio = mês atual"
+        type: string
+        default: ""
+      anomalia:
+        description: "Incluir os mapas de anomalia"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: previsao-mensal
+  cancel-in-progress: false
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/Sao_Paulo
+      RAMO_MENSAL: mensal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: eccodes (para o cfgrib ler GRIB)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeccodes0
+
+      - name: dependências python
+        run: |
+          python -m pip install --upgrade pip
+          pip install xarray cfgrib numpy matplotlib "cdsapi>=0.7"
+
+      - name: cache dos downloads do Copernicus (a mesma rodada não é baixada de novo)
+        uses: actions/cache@v4
+        with:
+          path: .cache_c3s
+          key: c3s-${{ github.run_id }}
+          restore-keys: |
+            c3s-
+
+      - name: gerar os mapas
+        env:
+          CDSAPI_KEY: ${{ secrets.CDSAPI_KEY }}
+          MES_INICIO: ${{ inputs.mes_inicio }}
+          ANOMALIA: ${{ inputs.anomalia }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CDSAPI_KEY:-}" ]; then
+            echo "::error::Falta o segredo CDSAPI_KEY com a chave do Copernicus (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          args=(--kml-estados estados.kml --saida previsao_mensal --cache .cache_c3s)
+          if [ -f logo.png ]; then args+=(--logo logo.png); fi
+          if [ -n "${MES_INICIO:-}" ]; then args+=(--mes-inicio "$MES_INICIO"); fi
+          if [ "${ANOMALIA:-true}" != "true" ]; then args+=(--sem-anomalia); fi
+          python -u gerar_previsao_mensal.py "${args[@]}"
+
+      - name: guardar os mapas para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: previsao-mensal-${{ github.run_id }}
+          path: previsao_mensal/
+          if-no-files-found: error
+          retention-days: 31
+
+      - name: publicar no ramo mensal (substitui a versão anterior)
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          export GIT_INDEX_FILE="$RUNNER_TEMP/indice-mensal"
+          rm -f "$GIT_INDEX_FILE"
+          git read-tree --empty
+          git add -f -- previsao_mensal
+          vazio=$(git hash-object -w --stdin < /dev/null)
+          git update-index --add --cacheinfo "100644,$vazio,.nojekyll"
+          arvore=$(git write-tree)
+          commit=$(git commit-tree "$arvore" -m "previsão dos próximos 3 meses $(date +%Y-%m-%dT%H:%M%z)")
+          unset GIT_INDEX_FILE
+          for i in 1 2 3 4 5; do
+            if git push --force origin "$commit:refs/heads/$RAMO_MENSAL"; then
+              echo "Publicado no ramo $RAMO_MENSAL: $(git ls-tree -r --name-only "$commit" | grep -c '\.png$') PNGs."
+              exit 0
+            fi
+            echo "retry $i..."; sleep 10
+          done
+          echo "Falhou ao publicar no ramo $RAMO_MENSAL após 5 tentativas."; exit 1

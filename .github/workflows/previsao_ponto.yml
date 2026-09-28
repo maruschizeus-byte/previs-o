@@ -2,7 +2,9 @@ name: previsao-ponto
 
 # Coloque em .github/workflows/previsao_ponto.yml (junto do previsao_regioes.yml).
 # Mapas em volta de um ponto (150 km para cada lado), separados dos mapas
-# diários: não mexe no ramo "mapas". Os mapas saem no .zip em Artifacts.
+# diários: não mexe no ramo "mapas". Cada ponto é publicado no ramo "pontos"
+# (um único commit; os pontos anteriores continuam lá) e fica também no .zip
+# em Artifacts por 7 dias.
 #
 # Uso: Actions > previsao-ponto > Run workflow, preencha nome e coordenada.
 # A coordenada pode ser colada como o Google Maps copia: -15.601, -56.097
@@ -35,15 +37,30 @@ on:
         default: "chuva tmin tmax"
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:  # um ponto de cada vez: um não apaga o outro no ramo "pontos"
+  group: previsao-ponto
+  cancel-in-progress: false
 
 jobs:
   gerar:
     runs-on: ubuntu-latest
     env:
       TZ: America/Sao_Paulo
+      RAMO_PONTOS: pontos
     steps:
       - uses: actions/checkout@v4
+
+      - name: trazer os pontos já publicados (ramo pontos)
+        run: |
+          rm -rf previsao_pontos
+          if git fetch --depth 1 origin "$RAMO_PONTOS" 2>/dev/null; then
+            git archive FETCH_HEAD previsao_pontos | tar -x
+            echo "Pontos já publicados: $(find previsao_pontos -mindepth 1 -maxdepth 1 -type d | wc -l)"
+          else
+            echo "Ramo $RAMO_PONTOS ainda não existe; este será o primeiro ponto."
+          fi
 
       - uses: actions/setup-python@v5
         with:
@@ -100,3 +117,28 @@ jobs:
           path: previsao_pontos/
           if-no-files-found: error
           retention-days: 7
+
+      - name: publicar no ramo pontos (os pontos anteriores continuam)
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          export GIT_INDEX_FILE="$RUNNER_TEMP/indice-pontos"
+          rm -f "$GIT_INDEX_FILE"
+          git read-tree --empty
+          git add -f -- previsao_pontos
+          vazio=$(git hash-object -w --stdin < /dev/null)
+          git update-index --add --cacheinfo "100644,$vazio,.nojekyll"
+          arvore=$(git write-tree)
+          commit=$(git commit-tree "$arvore" -m "ponto: $NOME_PONTO $(date +%Y-%m-%dT%H:%M%z)")
+          unset GIT_INDEX_FILE
+          for i in 1 2 3 4 5; do
+            if git push --force origin "$commit:refs/heads/$RAMO_PONTOS"; then
+              echo "Publicado no ramo $RAMO_PONTOS: $(git ls-tree -r --name-only "$commit" | grep -c '\.png$') PNGs."
+              exit 0
+            fi
+            echo "retry $i..."; sleep 10
+          done
+          echo "Falhou ao publicar no ramo $RAMO_PONTOS após 5 tentativas."; exit 1
+        env:
+          NOME_PONTO: ${{ inputs.nome }}

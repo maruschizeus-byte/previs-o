@@ -17,6 +17,8 @@ name: previsao-regioes
 #   - Para gerar só algumas regiões, DESMARQUE e preencha "Regiões".
 #   - A execução completa (agendada, ou com "Todas" marcado) substitui todos os
 #     mapas do ramo. A parcial (com "Regiões") troca só as áreas geradas.
+#   - "Gerar só as áreas de Regiões" deixa de fora o Brasil, os estados e as
+#     regiões automáticos: sai só o que foi pedido.
 #   - Confira os caminhos dos KMLs, inclusive letras maiúsculas/minúsculas.
 #   - As pastas incluem regiao.json e são preparadas antes dos downloads.
 
@@ -37,6 +39,10 @@ on:
       regioes:
         description: "Só se DESMARCAR acima — regiões (ex.: SP;MG;3105)"
         default: ""
+      so_escolhidas:
+        description: "Gerar só as áreas de Regiões (sem Brasil, estados e regiões automáticos)"
+        type: boolean
+        default: false
       recortar:
         description: "Recortar o preenchimento ao contorno da região"
         type: boolean
@@ -139,6 +145,7 @@ jobs:
           DIAS:    ${{ inputs.dias    || '0 1 2 3 4 5 6 7' }}
           VARS:    ${{ inputs.vars    || 'chuva tmin tmax' }}
           REGIOES: ${{ inputs.regioes || '' }}
+          SO_ESCOLHIDAS: ${{ inputs.so_escolhidas || false }}
           RECORTAR: ${{ inputs.recortar || false }}
           KML_ESTADOS: ${{ inputs.kml_estados || 'estados.kml' }}
           KML_MESO: ${{ inputs.kml_meso || 'mesorregioes.kml' }}
@@ -150,7 +157,7 @@ jobs:
           # Inclui hoje mesmo se o formulário enviar a configuração antiga (1 a 7).
           # O script elimina dias repetidos antes de calcular e gerar as figuras.
           args=(
-            --todos-estados --regioes-brasil
+            --todos-estados
             --kml "$KML_ESTADOS" "$KML_MESO"
             --fundo "$KML_ESTADOS"
             --kml-meso "$KML_MESO"
@@ -160,9 +167,12 @@ jobs:
             --saida previsao_regioes
           )
           if [ "$TODAS" = "true" ]; then
-            args+=(--todas-meso)
+            args+=(--todas-meso --regioes-brasil)
+          elif [ -n "$REGIOES" ] && [ "${SO_ESCOLHIDAS:-false}" = "true" ]; then
+            # Só o que foi escolhido (ex.: pela ferramenta: pasta:SP;pasta:regioes/Sul;pasta:brasil).
+            args+=(--regioes "$REGIOES" --sem-brasil --sem-estados)
           elif [ -n "$REGIOES" ]; then
-            args+=(--regioes "$REGIOES")
+            args+=(--regioes "$REGIOES" --regioes-brasil)
           else
             echo "::error::Marque Todas as mesorregiões ou preencha Regiões."
             exit 1

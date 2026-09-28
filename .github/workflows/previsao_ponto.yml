@@ -1,0 +1,102 @@
+name: previsao-ponto
+
+# Coloque em .github/workflows/previsao_ponto.yml (junto do previsao_regioes.yml).
+# Mapas em volta de um ponto (150 km para cada lado), separados dos mapas
+# diários: não mexe no ramo "mapas". Os mapas saem no .zip em Artifacts.
+#
+# Uso: Actions > previsao-ponto > Run workflow, preencha nome e coordenada.
+# A coordenada pode ser colada como o Google Maps copia: -15.601, -56.097
+# Se a execução diária do dia já rodou, os downloads do ECMWF são reaproveitados.
+
+run-name: "Previsão para ${{ inputs.nome }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      nome:
+        description: "Nome do ponto (ex.: Fazenda Boa Vista)"
+        required: true
+        type: string
+      coordenada:
+        description: "Coordenada, como o Google Maps copia (ex.: -15.601, -56.097)"
+        required: true
+        type: string
+      raio:
+        description: "Km para cada lado do ponto"
+        type: string
+        default: "150"
+      dias:
+        description: "Dias: 0=hoje, 1=amanhã, até 7. Hoje é sempre incluído."
+        type: string
+        default: "0 1 2 3 4 5 6 7"
+      vars:
+        description: "Variáveis: chuva tmin tmax (nuvem também existe)"
+        type: string
+        default: "chuva tmin tmax"
+
+permissions:
+  contents: read
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/Sao_Paulo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: eccodes (para o cfgrib ler GRIB)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeccodes0
+
+      - name: dependências python
+        run: |
+          python -m pip install --upgrade pip
+          pip install "ecmwf-opendata>=0.3.34" xarray cfgrib numpy matplotlib
+
+      - name: data de Brasília para a chave de cache
+        id: dt
+        run: echo "d=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: aproveitar os downloads do dia (cache da execução diária)
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache_ecmwf
+          key: ecmwf-brasilia-v1-${{ steps.dt.outputs.d }}-ponto-${{ github.run_id }}
+          restore-keys: |
+            ecmwf-brasilia-v1-${{ steps.dt.outputs.d }}-
+
+      - name: gerar os mapas do ponto
+        env:
+          NOME: ${{ inputs.nome }}
+          COORDENADA: ${{ inputs.coordenada }}
+          RAIO: ${{ inputs.raio || '150' }}
+          DIAS: ${{ inputs.dias || '0 1 2 3 4 5 6 7' }}
+          VARS: ${{ inputs.vars || 'chuva tmin tmax' }}
+        run: |
+          set -euo pipefail
+          read -r -a dias_args <<< "$DIAS"
+          read -r -a vars_args <<< "$VARS"
+          args=(
+            --kml estados.kml mesorregioes.kml
+            --fundo estados.kml
+            --kml-meso mesorregioes.kml
+            --vars "${vars_args[@]}" --dias 0 "${dias_args[@]}"
+            --ponto "$NOME" "$COORDENADA" --raio "${RAIO//,/.}"
+            --saida previsao_pontos
+          )
+          if [ -f logo.png ]; then args+=(--logo logo.png); fi
+          python -u gerar_previsao_regiao.py "${args[@]}"
+
+      - name: guardar os mapas para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapas-ponto-${{ github.run_id }}
+          path: previsao_pontos/
+          if-no-files-found: error
+          retention-days: 7

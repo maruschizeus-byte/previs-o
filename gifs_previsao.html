@@ -58,7 +58,7 @@ select{width:100%;background:#fff;border:1px solid #d0dcd5;border-radius:8px;min
 .bloco-fmt{border-top:1px solid var(--line);padding-top:14px}
 .formato{border:0;padding:0;margin:0;min-width:0}
 .formato legend{font-size:13px;font-weight:600;padding:0;margin-bottom:6px}
-.segmentos{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #d0dcd5;border-radius:9px;padding:3px;gap:3px;background:#f5f8f6}
+.segmentos{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #d0dcd5;border-radius:9px;padding:3px;gap:3px;background:#f5f8f6}
 .segmentos label{margin:0;position:relative}
 .segmentos input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
 .segmentos span{display:block;text-align:center;padding:7px 4px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted)}
@@ -107,6 +107,28 @@ select{width:100%;background:#fff;border:1px solid #d0dcd5;border-radius:8px;min
 .quadro[aria-pressed="false"]{background:#f4f6f4;border-style:dashed}
 .quadro[aria-pressed="false"] canvas{opacity:.28}
 .quadro[aria-pressed="false"] .dia::after{content:" · fora";font-weight:500;color:var(--muted)}
+/* janela do GitHub */
+dialog.gh{border:0;border-radius:16px;padding:0;width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 32px);box-shadow:0 20px 60px #0f2a2240;color:var(--ink)}
+dialog.gh::backdrop{background:#0f2a2266}
+.gh-topo{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:var(--head);color:#fff;position:sticky;top:0;z-index:1}
+.gh-topo h2{margin:0;font-size:18px}
+.gh-topo button{background:none;border:0;color:#fff;font-size:26px;line-height:1;padding:0 4px}
+.gh-bloco{padding:16px 20px;border-bottom:1px solid var(--line)}
+.gh-bloco h3{font-size:14px;margin:0 0 10px}
+.gh-bloco input[type=text],.gh-bloco input[type=password],.gh-bloco input:not([type]){width:100%;border:1px solid #d0dcd5;border-radius:8px;min-height:38px;padding:7px 10px;margin:0 0 10px;font:inherit}
+.gh-linha{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.gh-ramos{display:grid;gap:8px}
+.gh-ramo{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:#fff;text-align:left;width:100%}
+.gh-ramo:hover:not(:disabled){border-color:var(--green);background:var(--pale)}
+.gh-ramo strong{display:block;font-size:13.5px}
+.gh-ramo small{color:var(--muted);font-size:12px}
+.gh-ramo span.ir{color:var(--green-dark);font-weight:600;font-size:13px;white-space:nowrap}
+.gh-exec{margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#f7f9f7;font-size:13px}
+.gh-exec .passo{color:var(--muted);margin-top:2px}
+.gh-exec a{color:var(--green-dark);font-weight:600}
+.ajuda{font-size:12.5px;color:var(--muted);margin-top:10px}
+.ajuda ol{margin:6px 0 0;padding-left:18px}
+.ajuda summary,.gh-bloco details summary{cursor:pointer;color:var(--green-dark);font-weight:600}
 @media(max-width:900px){.app{grid-template-columns:1fr}.tela{height:52vh}}
 @media(max-width:560px){.page{padding:14px 12px 30px}.top{padding:16px}.brand p{display:none}.duas{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
@@ -121,6 +143,7 @@ select{width:100%;background:#fff;border:1px solid #d0dcd5;border-radius:8px;min
   <div class="top-actions" id="acoes-topo" hidden>
     <button class="btn light" data-abre="pasta" type="button">Abrir pasta</button>
     <button class="btn ghost" data-abre="zip" type="button">Abrir .zip</button>
+    <button class="btn ghost" data-gh="abrir" type="button">GitHub</button>
   </div>
   <input type="file" id="in-pasta" webkitdirectory directory multiple hidden>
   <input type="file" id="in-zip" accept=".zip,application/zip" hidden>
@@ -135,6 +158,7 @@ select{width:100%;background:#fff;border:1px solid #d0dcd5;border-radius:8px;min
       <div class="drop-actions">
         <button class="btn" data-abre="pasta" type="button">Abrir pasta</button>
         <button class="btn outline" data-abre="zip" type="button">Abrir .zip</button>
+        <button class="btn outline" data-gh="abrir" type="button">Abrir do GitHub</button>
       </div>
       <p class="carga" id="carga" role="status" aria-live="polite"></p>
       <p class="erro" id="erro-carga" hidden></p>
@@ -152,12 +176,13 @@ select{width:100%;background:#fff;border:1px solid #d0dcd5;border-radius:8px;min
         <legend>Formato</legend>
         <div class="segmentos">
           <label><input type="radio" name="formato" value="gif" checked><span>GIF</span></label>
-          <label><input type="radio" name="formato" value="mp4"><span>Vídeo MP4</span></label>
-          <label><input type="radio" name="formato" value="webm"><span>Vídeo WebM</span></label>
+          <label><input type="radio" name="formato" value="mp4"><span>MP4</span></label>
+          <label><input type="radio" name="formato" value="webm"><span>WebM</span></label>
+          <label><input type="radio" name="formato" value="png"><span>Imagens</span></label>
         </div>
         <p class="nota-fmt" id="nota-fmt"></p>
       </fieldset></div>
-      <div class="duas">
+      <div class="duas" id="opcoes-animacao">
         <div class="campo"><label for="sel-tempo">Tempo por dia</label>
           <select id="sel-tempo"><option value="0.4">0,4 s</option><option value="0.6">0,6 s</option><option value="0.8">0,8 s</option><option value="1" selected>1 s</option><option value="1.5">1,5 s</option><option value="2">2 s</option><option value="3">3 s</option></select></div>
         <div class="campo"><label for="sel-pausa">Pausa no fim</label>
@@ -168,7 +193,7 @@ select{width:100%;background:#fff;border:1px solid #d0dcd5;border-radius:8px;min
           <select id="sel-rep"><option value="sempre" selected>Sem parar</option><option value="uma">Uma vez</option></select></div>
       </div>
       <label class="opc acum" id="linha-acum" hidden><input type="checkbox" id="chk-acum" checked>
-        <span>Terminar com a chuva acumulada<small id="nota-acum"></small></span></label>
+        <span><span id="txt-acum">Terminar com a chuva acumulada</span><small id="nota-acum"></small></span></label>
       <div class="acoes">
         <button class="btn" id="criar" type="button">Criar GIF</button>
         <a class="btn outline" id="baixar" aria-disabled="true" role="button">Baixar GIF</a>
@@ -219,6 +244,51 @@ select{width:100%;background:#fff;border:1px solid #d0dcd5;border-radius:8px;min
   </section>
 </main>
 
+<dialog class="gh" id="dlg-gh" aria-labelledby="gh-titulo">
+  <form method="dialog" class="gh-topo"><h2 id="gh-titulo">GitHub</h2><button type="submit" aria-label="Fechar">×</button></form>
+  <section class="gh-bloco">
+    <h3>1. Conectar</h3>
+    <label for="gh-repo">Repositório</label><input id="gh-repo" type="text" placeholder="usuario/repositorio" autocomplete="off" spellcheck="false">
+    <label for="gh-token">Token de acesso</label><input id="gh-token" type="password" placeholder="github_pat_..." autocomplete="off" spellcheck="false">
+    <label class="opc"><input type="checkbox" id="gh-lembrar"> Lembrar repositório e token neste computador</label>
+    <details><summary>Avançado</summary><label for="gh-api" style="margin-top:8px">Endereço da API (GitHub Enterprise)</label><input id="gh-api" type="text" value="https://api.github.com" spellcheck="false"></details>
+    <div class="acoes" style="margin-top:10px"><button class="btn" id="gh-conectar" type="button">Conectar</button><button class="btn outline" id="gh-esquecer" type="button">Esquecer token</button></div>
+    <p class="status" id="gh-status" role="status" aria-live="polite"></p>
+    <details class="ajuda"><summary>Como criar o token</summary><ol>
+      <li>No GitHub, clique na sua foto → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.</li>
+      <li>Em Repository access, escolha "Only select repositories" e marque este repositório.</li>
+      <li>Em Permissions → Repository permissions: Actions = Read and write; Contents = Read-only.</li>
+      <li>Gere e copie o token (começa com github_pat_). Ele só aparece uma vez.</li>
+    </ol></details>
+  </section>
+  <section class="gh-bloco" id="gh-bloco-abrir" hidden>
+    <h3>2. Abrir mapas</h3>
+    <div class="gh-ramos" id="gh-ramos"></div>
+  </section>
+  <section class="gh-bloco" id="gh-bloco-rodar" hidden>
+    <h3>3. Rodar no GitHub</h3>
+    <div class="segmentos" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
+      <label><input type="radio" name="gh-tipo" value="ponto" checked><span>Um ponto</span></label>
+      <label><input type="radio" name="gh-tipo" value="mensal"><span>3 meses</span></label>
+      <label><input type="radio" name="gh-tipo" value="diario"><span>Diários</span></label>
+    </div>
+    <div id="gh-form-ponto">
+      <label for="gh-nome">Nome do ponto</label><input id="gh-nome" type="text" placeholder="Fazenda Boa Vista">
+      <div class="gh-linha">
+        <div><label for="gh-coord">Coordenada</label><input id="gh-coord" type="text" placeholder="-15.601, -56.097"></div>
+        <div><label for="gh-raio">Km para cada lado</label><input id="gh-raio" type="text" value="150"></div>
+      </div>
+    </div>
+    <div id="gh-form-mensal" hidden>
+      <label for="gh-mes">Primeiro mês (vazio = mês atual)</label><input id="gh-mes" type="text" placeholder="2026-10">
+      <label class="opc"><input type="checkbox" id="gh-anomalia" checked> Incluir a anomalia</label>
+    </div>
+    <p class="nota" id="gh-form-diario" hidden>Gera agora todos os mapas diários, como a execução das 06:05. Leva de 20 a 40 minutos.</p>
+    <button class="btn" id="gh-rodar" type="button" style="margin-top:6px">Rodar</button>
+    <div class="gh-exec" id="gh-exec" hidden><strong id="gh-exec-estado"></strong><div class="passo" id="gh-exec-passo"></div><div class="passo"><a id="gh-exec-link" target="_blank" rel="noopener">Ver no GitHub</a></div></div>
+  </section>
+</dialog>
+
 <script>
 /*! mp4-muxer 5.2.2 · MIT License · Copyright (c) 2023 Vanilagy · https://github.com/Vanilagy/mp4-muxer */
 "use strict";var Mp4Muxer=(()=>{var e=Object.defineProperty,t=Object.getOwnPropertyDescriptor,i=Object.getOwnPropertyNames,s=Object.prototype.hasOwnProperty,a=(e,t,i)=>{if(!t.has(e))throw TypeError("Cannot "+i)},r=(e,t,i)=>(a(e,t,"read from private field"),i?i.call(e):t.get(e)),n=(e,t,i)=>{if(t.has(e))throw TypeError("Cannot add the same private member more than once");t instanceof WeakSet?t.add(e):t.set(e,i)},o=(e,t,i,s)=>(a(e,t,"write to private field"),s?s.call(e,i):t.set(e,i),i),h=(e,t,i)=>(a(e,t,"access private method"),i),l={};((t,i)=>{for(var s in i)e(t,s,{get:i[s],enumerable:!0})})(l,{ArrayBufferTarget:()=>Me,FileSystemWritableFileStreamTarget:()=>Oe,Muxer:()=>Rt,StreamTarget:()=>We});var d,f,u,m,p,c,w,g,b=new Uint8Array(8),y=new DataView(b.buffer),k=e=>[(e%256+256)%256],T=e=>(y.setUint16(0,e,!1),[b[0],b[1]]),C=e=>(y.setUint32(0,e,!1),[b[1],b[2],b[3]]),v=e=>(y.setUint32(0,e,!1),[b[0],b[1],b[2],b[3]]),S=e=>(y.setUint32(0,Math.floor(e/2**32),!1),y.setUint32(4,e,!1),[b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7]]),x=e=>(y.setInt16(0,256*e,!1),[b[0],b[1]]),z=e=>(y.setInt32(0,65536*e,!1),[b[0],b[1],b[2],b[3]]),E=e=>(y.setInt32(0,2**30*e,!1),[b[0],b[1],b[2],b[3]]),A=(e,t=!1)=>{let i=Array(e.length).fill(null).map((t,i)=>e.charCodeAt(i));return t&&i.push(0),i},M=e=>e&&e[e.length-1],W=e=>{let t;for(let i of e)(!t||i.presentationTimestamp>t.presentationTimestamp)&&(t=i);return t},O=(e,t,i=!0)=>{let s=e*t;return i?Math.round(s):s},B=e=>{let t=e*(Math.PI/180),i=Math.cos(t),s=Math.sin(t);return[i,s,0,-s,i,0,0,0,1]},U=B(0),D=e=>[z(e[0]),z(e[1]),E(e[2]),z(e[3]),z(e[4]),E(e[5]),z(e[6]),z(e[7]),E(e[8])],j=e=>e?"object"!=typeof e?e:Array.isArray(e)?e.map(j):Object.fromEntries(Object.entries(e).map(([e,t])=>[e,j(t)])):e,R=e=>e>=0&&e<2**32,I=(e,t,i)=>({type:e,contents:t&&new Uint8Array(t.flat(10)),children:i}),N=(e,t,i,s,a)=>I(e,[k(t),C(i),s??[]],a),V=e=>({type:"mdat",largeSize:e}),F=(e,t,i=!1)=>I("moov",null,[L(t,e),...e.map(e=>$(e,t)),i?me(e):null]),L=(e,t)=>{let i=O(Math.max(0,...t.filter(e=>e.samples.length>0).map(e=>{const t=W(e.samples);return t.presentationTimestamp+t.duration})),Bt),s=Math.max(...t.map(e=>e.id))+1,a=!R(e)||!R(i),r=a?S:v;return N("mvhd",+a,0,[r(e),r(e),v(Bt),r(i),z(1),x(1),Array(10).fill(0),D(U),Array(24).fill(0),v(s)])},$=(e,t)=>I("trak",null,[P(e,t),H(e,t)]),P=(e,t)=>{let i,s=W(e.samples),a=O(s?s.presentationTimestamp+s.duration:0,Bt),r=!R(t)||!R(a),n=r?S:v;return i="video"===e.info.type?"number"==typeof e.info.rotation?B(e.info.rotation):e.info.rotation:U,N("tkhd",+r,3,[n(t),n(t),v(e.id),v(0),n(a),Array(8).fill(0),T(0),T(0),x("audio"===e.info.type?1:0),T(0),D(i),z("video"===e.info.type?e.info.width:0),z("video"===e.info.type?e.info.height:0)])},H=(e,t)=>I("mdia",null,[_(e,t),q("video"===e.info.type?"vide":"soun"),G(e)]),_=(e,t)=>{let i=W(e.samples),s=O(i?i.presentationTimestamp+i.duration:0,e.timescale),a=!R(t)||!R(s),r=a?S:v;return N("mdhd",+a,0,[r(t),r(t),v(e.timescale),r(s),T(21956),T(0)])},q=e=>N("hdlr",0,0,[A("mhlr"),A(e),v(0),v(0),v(0),A("mp4-muxer-hdlr",!0)]),G=e=>I("minf",null,["video"===e.info.type?J():K(),Q(),Z(e)]),J=()=>N("vmhd",0,1,[T(0),T(0),T(0),T(0)]),K=()=>N("smhd",0,0,[T(0),T(0)]),Q=()=>I("dinf",null,[X()]),X=()=>N("dref",0,0,[v(1)],[Y()]),Y=()=>N("url ",0,1),Z=e=>{const t=e.compositionTimeOffsetTable.length>1||e.compositionTimeOffsetTable.some(e=>0!==e.sampleCompositionTimeOffset);return I("stbl",null,[ee(e),oe(e),he(e),le(e),de(e),fe(e),t?ue(e):null])},ee=e=>N("stsd",0,0,[v(1)],["video"===e.info.type?te(Se[e.info.codec],e):ne(ze[e.info.codec],e)]),te=(e,t)=>{return I(e,[Array(6).fill(0),T(1),T(0),T(0),Array(12).fill(0),T(t.info.width),T(t.info.height),v(4718592),v(4718592),v(0),T(1),Array(32).fill(0),T(24),(i=65535,y.setInt16(0,i,!1),[b[0],b[1]])],[xe[t.info.codec](t),t.info.decoderConfig.colorSpace?re(t):null]);var i},ie={bt709:1,bt470bg:5,smpte170m:6},se={bt709:1,smpte170m:6,"iec61966-2-1":13},ae={rgb:0,bt709:1,bt470bg:5,smpte170m:6},re=e=>I("colr",[A("nclx"),T(ie[e.info.decoderConfig.colorSpace.primaries]),T(se[e.info.decoderConfig.colorSpace.transfer]),T(ae[e.info.decoderConfig.colorSpace.matrix]),k((e.info.decoderConfig.colorSpace.fullRange?1:0)<<7)]),ne=(e,t)=>I(e,[Array(6).fill(0),T(1),T(0),T(0),v(0),T(t.info.numberOfChannels),T(16),T(0),T(0),z(t.info.sampleRate)],[Ee[t.info.codec](t)]),oe=e=>N("stts",0,0,[v(e.timeToSampleTable.length),e.timeToSampleTable.map(e=>[v(e.sampleCount),v(e.sampleDelta)])]),he=e=>{if(e.samples.every(e=>"key"===e.type))return null;let t=[...e.samples.entries()].filter(([,e])=>"key"===e.type);return N("stss",0,0,[v(t.length),t.map(([e])=>v(e+1))])},le=e=>N("stsc",0,0,[v(e.compactlyCodedChunkTable.length),e.compactlyCodedChunkTable.map(e=>[v(e.firstChunk),v(e.samplesPerChunk),v(1)])]),de=e=>N("stsz",0,0,[v(0),v(e.samples.length),e.samples.map(e=>v(e.size))]),fe=e=>e.finalizedChunks.length>0&&M(e.finalizedChunks).offset>=2**32?N("co64",0,0,[v(e.finalizedChunks.length),e.finalizedChunks.map(e=>S(e.offset))]):N("stco",0,0,[v(e.finalizedChunks.length),e.finalizedChunks.map(e=>v(e.offset))]),ue=e=>N("ctts",0,0,[v(e.compositionTimeOffsetTable.length),e.compositionTimeOffsetTable.map(e=>[v(e.sampleCount),v(e.sampleCompositionTimeOffset)])]),me=e=>I("mvex",null,e.map(pe)),pe=e=>N("trex",0,0,[v(e.id),v(1),v(0),v(0),v(0)]),ce=(e,t)=>I("moof",null,[we(e),...t.map(be)]),we=e=>N("mfhd",0,0,[v(e)]),ge=e=>{let t=0,i=0,s="delta"===e.type;return i|=+s,t|=s?1:2,t<<24|i<<16},be=e=>I("traf",null,[ye(e),ke(e),Te(e)]),ye=e=>{let t=0;t|=8,t|=16,t|=32,t|=131072;let i=e.currentChunk.samples[1]??e.currentChunk.samples[0],s={duration:i.timescaleUnitsToNextSample,size:i.size,flags:ge(i)};return N("tfhd",0,131128,[v(e.id),v(s.duration),v(s.size),v(s.flags)])},ke=e=>N("tfdt",1,0,[S(O(e.currentChunk.startTimestamp,e.timescale))]),Te=e=>{let t=e.currentChunk.samples.map(e=>e.timescaleUnitsToNextSample),i=e.currentChunk.samples.map(e=>e.size),s=e.currentChunk.samples.map(ge),a=e.currentChunk.samples.map(t=>O(t.presentationTimestamp-t.decodeTimestamp,e.timescale)),r=new Set(t),n=new Set(i),o=new Set(s),h=new Set(a),l=2===o.size&&s[0]!==s[1],d=r.size>1,f=n.size>1,u=!l&&o.size>1,m=h.size>1||[...h].some(e=>0!==e),p=0;return p|=1,p|=4*+l,p|=256*+d,p|=512*+f,p|=1024*+u,p|=2048*+m,N("trun",1,p,[v(e.currentChunk.samples.length),v(e.currentChunk.offset-e.currentChunk.moofOffset||0),l?v(s[0]):[],e.currentChunk.samples.map((e,r)=>{return[d?v(t[r]):[],f?v(i[r]):[],u?v(s[r]):[],m?(n=a[r],y.setInt32(0,n,!1),[b[0],b[1],b[2],b[3]]):[]];var n})])},Ce=(e,t)=>N("tfra",1,0,[v(e.id),v(63),v(e.finalizedChunks.length),e.finalizedChunks.map(i=>[S(O(i.startTimestamp,e.timescale)),S(i.moofOffset),v(t+1),v(1),v(1)])]),ve=()=>N("mfro",0,0,[v(0)]),Se={avc:"avc1",hevc:"hvc1",vp9:"vp09",av1:"av01"},xe={avc:e=>e.info.decoderConfig&&I("avcC",[...new Uint8Array(e.info.decoderConfig.description)]),hevc:e=>e.info.decoderConfig&&I("hvcC",[...new Uint8Array(e.info.decoderConfig.description)]),vp9:e=>{if(!e.info.decoderConfig)return null;let t=e.info.decoderConfig;if(!t.colorSpace)throw new Error("'colorSpace' is required in the decoder config for VP9.");let i=t.codec.split("."),s=Number(i[1]),a=Number(i[2]),r=0+(Number(i[3])<<4)+Number(t.colorSpace.fullRange);return N("vpcC",1,0,[k(s),k(a),k(r),k(2),k(2),k(2),T(0)])},av1:()=>I("av1C",[129,0,0,0])},ze={aac:"mp4a",opus:"Opus"},Ee={aac:e=>{let t=new Uint8Array(e.info.decoderConfig.description);return N("esds",0,0,[v(58753152),k(32+t.byteLength),T(1),k(0),v(75530368),k(18+t.byteLength),k(64),k(21),C(0),v(130071),v(130071),v(92307584),k(t.byteLength),...t,v(109084800),k(1),k(2)])},opus:e=>{let t=3840,i=0;const s=e.info.decoderConfig?.description;if(s){if(s.byteLength<18)throw new TypeError("Invalid decoder description provided for Opus; must be at least 18 bytes long.");const e=ArrayBuffer.isView(s)?new DataView(s.buffer,s.byteOffset,s.byteLength):new DataView(s);t=e.getUint16(10,!0),i=e.getInt16(14,!0)}return I("dOps",[k(0),k(e.info.numberOfChannels),T(t),v(e.info.sampleRate),x(i),k(0)])}},Ae=(Symbol("isTarget"),class{}),Me=class extends Ae{constructor(){super(...arguments),this.buffer=null}},We=class extends Ae{constructor(e){if(super(),this.options=e,"object"!=typeof e)throw new TypeError("StreamTarget requires an options object to be passed to its constructor.");if(e.onData){if("function"!=typeof e.onData)throw new TypeError("options.onData, when provided, must be a function.");if(e.onData.length<2)throw new TypeError("options.onData, when provided, must be a function that takes in at least two arguments (data and position). Ignoring the position argument, which specifies the byte offset at which the data is to be written, can lead to broken outputs.")}if(void 0!==e.chunked&&"boolean"!=typeof e.chunked)throw new TypeError("options.chunked, when provided, must be a boolean.");if(void 0!==e.chunkSize&&(!Number.isInteger(e.chunkSize)||e.chunkSize<1024))throw new TypeError("options.chunkSize, when provided, must be an integer and not smaller than 1024.")}},Oe=class extends Ae{constructor(e,t){if(super(),this.stream=e,this.options=t,!(e instanceof FileSystemWritableFileStream))throw new TypeError("FileSystemWritableFileStreamTarget requires a FileSystemWritableFileStream instance.");if(void 0!==t&&"object"!=typeof t)throw new TypeError("FileSystemWritableFileStreamTarget's options, when provided, must be an object.");if(t&&void 0!==t.chunkSize&&(!Number.isInteger(t.chunkSize)||t.chunkSize<=0))throw new TypeError("options.chunkSize, when provided, must be a positive integer")}},Be=class{constructor(){this.pos=0,n(this,d,new Uint8Array(8)),n(this,f,new DataView(r(this,d).buffer)),this.offsets=new WeakMap}seek(e){this.pos=e}writeU32(e){r(this,f).setUint32(0,e,!1),this.write(r(this,d).subarray(0,4))}writeU64(e){r(this,f).setUint32(0,Math.floor(e/2**32),!1),r(this,f).setUint32(4,e,!1),this.write(r(this,d).subarray(0,8))}writeAscii(e){for(let t=0;t<e.length;t++)r(this,f).setUint8(t%8,e.charCodeAt(t)),t%8==7&&this.write(r(this,d));e.length%8!=0&&this.write(r(this,d).subarray(0,e.length%8))}writeBox(e){if(this.offsets.set(e,this.pos),e.contents&&!e.children)this.writeBoxHeader(e,e.size??e.contents.byteLength+8),this.write(e.contents);else{let t=this.pos;if(this.writeBoxHeader(e,0),e.contents&&this.write(e.contents),e.children)for(let t of e.children)t&&this.writeBox(t);let i=this.pos,s=e.size??i-t;this.seek(t),this.writeBoxHeader(e,s),this.seek(i)}}writeBoxHeader(e,t){this.writeU32(e.largeSize?1:t),this.writeAscii(e.type),e.largeSize&&this.writeU64(t)}measureBoxHeader(e){return 8+(e.largeSize?8:0)}patchBox(e){let t=this.pos;this.seek(this.offsets.get(e)),this.writeBox(e),this.seek(t)}measureBox(e){if(e.contents&&!e.children){return this.measureBoxHeader(e)+e.contents.byteLength}{let t=this.measureBoxHeader(e);if(e.contents&&(t+=e.contents.byteLength),e.children)for(let i of e.children)i&&(t+=this.measureBox(i));return t}}};d=new WeakMap,f=new WeakMap;var Ue=class extends Be{constructor(e){super(),n(this,w),n(this,u,void 0),n(this,m,new ArrayBuffer(65536)),n(this,p,new Uint8Array(r(this,m))),n(this,c,0),o(this,u,e)}write(e){h(this,w,g).call(this,this.pos+e.byteLength),r(this,p).set(e,this.pos),this.pos+=e.byteLength,o(this,c,Math.max(r(this,c),this.pos))}finalize(){h(this,w,g).call(this,this.pos),r(this,u).buffer=r(this,m).slice(0,Math.max(r(this,c),this.pos))}};u=new WeakMap,m=new WeakMap,p=new WeakMap,c=new WeakMap,w=new WeakSet,g=function(e){let t=r(this,m).byteLength;for(;t<e;)t*=2;if(t===r(this,m).byteLength)return;let i=new ArrayBuffer(t),s=new Uint8Array(i);s.set(r(this,p),0),o(this,m,i),o(this,p,s)};var De,je,Re,Ie,Ne,Ve,Fe,Le,$e,Pe,He,_e,qe,Ge=class extends Be{constructor(e){super(),n(this,Ve),n(this,Le),n(this,Pe),n(this,_e),n(this,De,void 0),n(this,je,[]),n(this,Re,void 0),n(this,Ie,void 0),n(this,Ne,[]),o(this,De,e),o(this,Re,e.options?.chunked??!1),o(this,Ie,e.options?.chunkSize??16777216)}write(e){r(this,je).push({data:e.slice(),start:this.pos}),this.pos+=e.byteLength}flush(){if(0===r(this,je).length)return;let e=[],t=[...r(this,je)].sort((e,t)=>e.start-t.start);e.push({start:t[0].start,size:t[0].data.byteLength});for(let i=1;i<t.length;i++){let s=e[e.length-1],a=t[i];a.start<=s.start+s.size?s.size=Math.max(s.size,a.start+a.data.byteLength-s.start):e.push({start:a.start,size:a.data.byteLength})}for(let t of e){t.data=new Uint8Array(t.size);for(let e of r(this,je))t.start<=e.start&&e.start<t.start+t.size&&t.data.set(e.data,e.start-t.start);r(this,Re)?(h(this,Ve,Fe).call(this,t.data,t.start),h(this,_e,qe).call(this)):r(this,De).options.onData?.(t.data,t.start)}r(this,je).length=0}finalize(){r(this,Re)&&h(this,_e,qe).call(this,!0)}};De=new WeakMap,je=new WeakMap,Re=new WeakMap,Ie=new WeakMap,Ne=new WeakMap,Ve=new WeakSet,Fe=function(e,t){let i=r(this,Ne).findIndex(e=>e.start<=t&&t<e.start+r(this,Ie));-1===i&&(i=h(this,Pe,He).call(this,t));let s=r(this,Ne)[i],a=t-s.start,n=e.subarray(0,Math.min(r(this,Ie)-a,e.byteLength));s.data.set(n,a);let o={start:a,end:a+n.byteLength};if(h(this,Le,$e).call(this,s,o),0===s.written[0].start&&s.written[0].end===r(this,Ie)&&(s.shouldFlush=!0),r(this,Ne).length>2){for(let e=0;e<r(this,Ne).length-1;e++)r(this,Ne)[e].shouldFlush=!0;h(this,_e,qe).call(this)}n.byteLength<e.byteLength&&h(this,Ve,Fe).call(this,e.subarray(n.byteLength),t+n.byteLength)},Le=new WeakSet,$e=function(e,t){let i=0,s=e.written.length-1,a=-1;for(;i<=s;){let r=Math.floor(i+(s-i+1)/2);e.written[r].start<=t.start?(i=r+1,a=r):s=r-1}for(e.written.splice(a+1,0,t),(-1===a||e.written[a].end<t.start)&&a++;a<e.written.length-1&&e.written[a].end>=e.written[a+1].start;)e.written[a].end=Math.max(e.written[a].end,e.written[a+1].end),e.written.splice(a+1,1)},Pe=new WeakSet,He=function(e){let t={start:Math.floor(e/r(this,Ie))*r(this,Ie),data:new Uint8Array(r(this,Ie)),written:[],shouldFlush:!1};return r(this,Ne).push(t),r(this,Ne).sort((e,t)=>e.start-t.start),r(this,Ne).indexOf(t)},_e=new WeakSet,qe=function(e=!1){for(let t=0;t<r(this,Ne).length;t++){let i=r(this,Ne)[t];if(i.shouldFlush||e){for(let e of i.written)r(this,De).options.onData?.(i.data.subarray(e.start,e.end),i.start+e.start);r(this,Ne).splice(t--,1)}}};var Je,Ke,Qe,Xe,Ye,Ze,et,tt,it,st,at,rt,nt,ot,ht,lt,dt,ft,ut,mt,pt,ct,wt,gt,bt,yt,kt,Tt,Ct,vt,St,xt,zt,Et,At,Mt,Wt,Ot=class extends Ge{constructor(e){super(new We({onData:(t,i)=>e.stream.write({type:"write",data:t,position:i}),chunked:!0,chunkSize:e.options?.chunkSize}))}},Bt=1e3,Ut=["avc","hevc","vp9","av1"],Dt=["aac","opus"],jt=["strict","offset","cross-track-offset"],Rt=class{constructor(e){if(n(this,nt),n(this,ht),n(this,dt),n(this,ut),n(this,pt),n(this,wt),n(this,bt),n(this,kt),n(this,Ct),n(this,St),n(this,zt),n(this,At),n(this,Je,void 0),n(this,Ke,void 0),n(this,Qe,void 0),n(this,Xe,void 0),n(this,Ye,null),n(this,Ze,null),n(this,et,Math.floor(Date.now()/1e3)+2082844800),n(this,tt,[]),n(this,it,1),n(this,st,[]),n(this,at,[]),n(this,rt,!1),h(this,nt,ot).call(this,e),e.video=j(e.video),e.audio=j(e.audio),e.fastStart=j(e.fastStart),this.target=e.target,o(this,Je,{firstTimestampBehavior:"strict",...e}),e.target instanceof Me)o(this,Ke,new Ue(e.target));else if(e.target instanceof We)o(this,Ke,new Ge(e.target));else{if(!(e.target instanceof Oe))throw new Error(`Invalid target: ${e.target}`);o(this,Ke,new Ot(e.target))}h(this,ut,mt).call(this),h(this,ht,lt).call(this)}addVideoChunk(e,t,i,s){if(!(e instanceof EncodedVideoChunk))throw new TypeError("addVideoChunk's first argument (sample) must be of type EncodedVideoChunk.");if(t&&"object"!=typeof t)throw new TypeError("addVideoChunk's second argument (meta), when provided, must be an object.");if(void 0!==i&&(!Number.isFinite(i)||i<0))throw new TypeError("addVideoChunk's third argument (timestamp), when provided, must be a non-negative real number.");if(void 0!==s&&!Number.isFinite(s))throw new TypeError("addVideoChunk's fourth argument (compositionTimeOffset), when provided, must be a real number.");let a=new Uint8Array(e.byteLength);e.copyTo(a),this.addVideoChunkRaw(a,e.type,i??e.timestamp,e.duration,t,s)}addVideoChunkRaw(e,t,i,s,a,n){if(!(e instanceof Uint8Array))throw new TypeError("addVideoChunkRaw's first argument (data) must be an instance of Uint8Array.");if("key"!==t&&"delta"!==t)throw new TypeError("addVideoChunkRaw's second argument (type) must be either 'key' or 'delta'.");if(!Number.isFinite(i)||i<0)throw new TypeError("addVideoChunkRaw's third argument (timestamp) must be a non-negative real number.");if(!Number.isFinite(s)||s<0)throw new TypeError("addVideoChunkRaw's fourth argument (duration) must be a non-negative real number.");if(a&&"object"!=typeof a)throw new TypeError("addVideoChunkRaw's fifth argument (meta), when provided, must be an object.");if(void 0!==n&&!Number.isFinite(n))throw new TypeError("addVideoChunkRaw's sixth argument (compositionTimeOffset), when provided, must be a real number.");if(h(this,At,Mt).call(this),!r(this,Je).video)throw new Error("No video track declared.");if("object"==typeof r(this,Je).fastStart&&r(this,Ye).samples.length===r(this,Je).fastStart.expectedVideoChunks)throw new Error(`Cannot add more video chunks than specified in 'fastStart' (${r(this,Je).fastStart.expectedVideoChunks}).`);let o=h(this,wt,gt).call(this,r(this,Ye),e,t,i,s,a,n);if("fragmented"===r(this,Je).fastStart&&r(this,Ze)){for(;r(this,at).length>0&&r(this,at)[0].decodeTimestamp<=o.decodeTimestamp;){let e=r(this,at).shift();h(this,bt,yt).call(this,r(this,Ze),e)}o.decodeTimestamp<=r(this,Ze).lastDecodeTimestamp?h(this,bt,yt).call(this,r(this,Ye),o):r(this,st).push(o)}else h(this,bt,yt).call(this,r(this,Ye),o)}addAudioChunk(e,t,i){if(!(e instanceof EncodedAudioChunk))throw new TypeError("addAudioChunk's first argument (sample) must be of type EncodedAudioChunk.");if(t&&"object"!=typeof t)throw new TypeError("addAudioChunk's second argument (meta), when provided, must be an object.");if(void 0!==i&&(!Number.isFinite(i)||i<0))throw new TypeError("addAudioChunk's third argument (timestamp), when provided, must be a non-negative real number.");let s=new Uint8Array(e.byteLength);e.copyTo(s),this.addAudioChunkRaw(s,e.type,i??e.timestamp,e.duration,t)}addAudioChunkRaw(e,t,i,s,a){if(!(e instanceof Uint8Array))throw new TypeError("addAudioChunkRaw's first argument (data) must be an instance of Uint8Array.");if("key"!==t&&"delta"!==t)throw new TypeError("addAudioChunkRaw's second argument (type) must be either 'key' or 'delta'.");if(!Number.isFinite(i)||i<0)throw new TypeError("addAudioChunkRaw's third argument (timestamp) must be a non-negative real number.");if(!Number.isFinite(s)||s<0)throw new TypeError("addAudioChunkRaw's fourth argument (duration) must be a non-negative real number.");if(a&&"object"!=typeof a)throw new TypeError("addAudioChunkRaw's fifth argument (meta), when provided, must be an object.");if(h(this,At,Mt).call(this),!r(this,Je).audio)throw new Error("No audio track declared.");if("object"==typeof r(this,Je).fastStart&&r(this,Ze).samples.length===r(this,Je).fastStart.expectedAudioChunks)throw new Error(`Cannot add more audio chunks than specified in 'fastStart' (${r(this,Je).fastStart.expectedAudioChunks}).`);let n=h(this,wt,gt).call(this,r(this,Ze),e,t,i,s,a);if("fragmented"===r(this,Je).fastStart&&r(this,Ye)){for(;r(this,st).length>0&&r(this,st)[0].decodeTimestamp<=n.decodeTimestamp;){let e=r(this,st).shift();h(this,bt,yt).call(this,r(this,Ye),e)}n.decodeTimestamp<=r(this,Ye).lastDecodeTimestamp?h(this,bt,yt).call(this,r(this,Ze),n):r(this,at).push(n)}else h(this,bt,yt).call(this,r(this,Ze),n)}finalize(){if(r(this,rt))throw new Error("Cannot finalize a muxer more than once.");if("fragmented"===r(this,Je).fastStart){for(let e of r(this,st))h(this,bt,yt).call(this,r(this,Ye),e);for(let e of r(this,at))h(this,bt,yt).call(this,r(this,Ze),e);h(this,St,xt).call(this,!1)}else r(this,Ye)&&h(this,Ct,vt).call(this,r(this,Ye)),r(this,Ze)&&h(this,Ct,vt).call(this,r(this,Ze));let e=[r(this,Ye),r(this,Ze)].filter(Boolean);if("in-memory"===r(this,Je).fastStart){let t;for(let i=0;i<2;i++){let i=F(e,r(this,et)),s=r(this,Ke).measureBox(i);t=r(this,Ke).measureBox(r(this,Xe));let a=r(this,Ke).pos+s+t;for(let e of r(this,tt)){e.offset=a;for(let{data:i}of e.samples)a+=i.byteLength,t+=i.byteLength}if(a<2**32)break;t>=2**32&&(r(this,Xe).largeSize=!0)}let i=F(e,r(this,et));r(this,Ke).writeBox(i),r(this,Xe).size=t,r(this,Ke).writeBox(r(this,Xe));for(let e of r(this,tt))for(let t of e.samples)r(this,Ke).write(t.data),t.data=null}else if("fragmented"===r(this,Je).fastStart){let t=r(this,Ke).pos,i=(e=>I("mfra",null,[...e.map(Ce),ve()]))(e);r(this,Ke).writeBox(i);let s=r(this,Ke).pos-t;r(this,Ke).seek(r(this,Ke).pos-4),r(this,Ke).writeU32(s)}else{let t=r(this,Ke).offsets.get(r(this,Xe)),i=r(this,Ke).pos-t;r(this,Xe).size=i,r(this,Xe).largeSize=i>=2**32,r(this,Ke).patchBox(r(this,Xe));let s=F(e,r(this,et));if("object"==typeof r(this,Je).fastStart){r(this,Ke).seek(r(this,Qe)),r(this,Ke).writeBox(s);let e=t-r(this,Ke).pos;r(this,Ke).writeBox({type:"free",size:e})}else r(this,Ke).writeBox(s)}h(this,zt,Et).call(this),r(this,Ke).finalize(),o(this,rt,!0)}};return Je=new WeakMap,Ke=new WeakMap,Qe=new WeakMap,Xe=new WeakMap,Ye=new WeakMap,Ze=new WeakMap,et=new WeakMap,tt=new WeakMap,it=new WeakMap,st=new WeakMap,at=new WeakMap,rt=new WeakMap,nt=new WeakSet,ot=function(e){if("object"!=typeof e)throw new TypeError("The muxer requires an options object to be passed to its constructor.");if(!(e.target instanceof Ae))throw new TypeError("The target must be provided and an instance of Target.");if(e.video){if(!Ut.includes(e.video.codec))throw new TypeError(`Unsupported video codec: ${e.video.codec}`);if(!Number.isInteger(e.video.width)||e.video.width<=0)throw new TypeError(`Invalid video width: ${e.video.width}. Must be a positive integer.`);if(!Number.isInteger(e.video.height)||e.video.height<=0)throw new TypeError(`Invalid video height: ${e.video.height}. Must be a positive integer.`);const t=e.video.rotation;if("number"==typeof t&&![0,90,180,270].includes(t))throw new TypeError(`Invalid video rotation: ${t}. Has to be 0, 90, 180 or 270.`);if(Array.isArray(t)&&(9!==t.length||t.some(e=>"number"!=typeof e)))throw new TypeError(`Invalid video transformation matrix: ${t.join()}`);if(void 0!==e.video.frameRate&&(!Number.isInteger(e.video.frameRate)||e.video.frameRate<=0))throw new TypeError(`Invalid video frame rate: ${e.video.frameRate}. Must be a positive integer.`)}if(e.audio){if(!Dt.includes(e.audio.codec))throw new TypeError(`Unsupported audio codec: ${e.audio.codec}`);if(!Number.isInteger(e.audio.numberOfChannels)||e.audio.numberOfChannels<=0)throw new TypeError(`Invalid number of audio channels: ${e.audio.numberOfChannels}. Must be a positive integer.`);if(!Number.isInteger(e.audio.sampleRate)||e.audio.sampleRate<=0)throw new TypeError(`Invalid audio sample rate: ${e.audio.sampleRate}. Must be a positive integer.`)}if(e.firstTimestampBehavior&&!jt.includes(e.firstTimestampBehavior))throw new TypeError(`Invalid first timestamp behavior: ${e.firstTimestampBehavior}`);if("object"==typeof e.fastStart){if(e.video){if(void 0===e.fastStart.expectedVideoChunks)throw new TypeError("'fastStart' is an object but is missing property 'expectedVideoChunks'.");if(!Number.isInteger(e.fastStart.expectedVideoChunks)||e.fastStart.expectedVideoChunks<0)throw new TypeError("'expectedVideoChunks' must be a non-negative integer.")}if(e.audio){if(void 0===e.fastStart.expectedAudioChunks)throw new TypeError("'fastStart' is an object but is missing property 'expectedAudioChunks'.");if(!Number.isInteger(e.fastStart.expectedAudioChunks)||e.fastStart.expectedAudioChunks<0)throw new TypeError("'expectedAudioChunks' must be a non-negative integer.")}}else if(![!1,"in-memory","fragmented"].includes(e.fastStart))throw new TypeError("'fastStart' option must be false, 'in-memory', 'fragmented' or an object.");if(void 0!==e.minFragmentDuration&&(!Number.isFinite(e.minFragmentDuration)||e.minFragmentDuration<0))throw new TypeError("'minFragmentDuration' must be a non-negative number.")},ht=new WeakSet,lt=function(){var e;if(r(this,Ke).writeBox((e={holdsAvc:"avc"===r(this,Je).video?.codec,fragmented:"fragmented"===r(this,Je).fastStart}).fragmented?I("ftyp",[A("iso5"),v(512),A("iso5"),A("iso6"),A("mp41")]):I("ftyp",[A("isom"),v(512),A("isom"),e.holdsAvc?A("avc1"):[],A("mp41")])),o(this,Qe,r(this,Ke).pos),"in-memory"===r(this,Je).fastStart)o(this,Xe,V(!1));else if("fragmented"===r(this,Je).fastStart);else{if("object"==typeof r(this,Je).fastStart){let e=h(this,dt,ft).call(this);r(this,Ke).seek(r(this,Ke).pos+e)}o(this,Xe,V(!0)),r(this,Ke).writeBox(r(this,Xe))}h(this,zt,Et).call(this)},dt=new WeakSet,ft=function(){if("object"!=typeof r(this,Je).fastStart)return;let e=0,t=[r(this,Je).fastStart.expectedVideoChunks,r(this,Je).fastStart.expectedAudioChunks];for(let i of t)i&&(e+=8*Math.ceil(2/3*i),e+=4*i,e+=12*Math.ceil(2/3*i),e+=4*i,e+=8*i);return e+=4096,e},ut=new WeakSet,mt=function(){if(r(this,Je).video&&o(this,Ye,{id:1,info:{type:"video",codec:r(this,Je).video.codec,width:r(this,Je).video.width,height:r(this,Je).video.height,rotation:r(this,Je).video.rotation??0,decoderConfig:null},timescale:r(this,Je).video.frameRate??57600,samples:[],finalizedChunks:[],currentChunk:null,firstDecodeTimestamp:void 0,lastDecodeTimestamp:-1,timeToSampleTable:[],compositionTimeOffsetTable:[],lastTimescaleUnits:null,lastSample:null,compactlyCodedChunkTable:[]}),r(this,Je).audio&&(o(this,Ze,{id:r(this,Je).video?2:1,info:{type:"audio",codec:r(this,Je).audio.codec,numberOfChannels:r(this,Je).audio.numberOfChannels,sampleRate:r(this,Je).audio.sampleRate,decoderConfig:null},timescale:r(this,Je).audio.sampleRate,samples:[],finalizedChunks:[],currentChunk:null,firstDecodeTimestamp:void 0,lastDecodeTimestamp:-1,timeToSampleTable:[],compositionTimeOffsetTable:[],lastTimescaleUnits:null,lastSample:null,compactlyCodedChunkTable:[]}),"aac"===r(this,Je).audio.codec)){let e=h(this,pt,ct).call(this,2,r(this,Je).audio.sampleRate,r(this,Je).audio.numberOfChannels);r(this,Ze).info.decoderConfig={codec:r(this,Je).audio.codec,description:e,numberOfChannels:r(this,Je).audio.numberOfChannels,sampleRate:r(this,Je).audio.sampleRate}}},pt=new WeakSet,ct=function(e,t,i){let s=[96e3,88200,64e3,48e3,44100,32e3,24e3,22050,16e3,12e3,11025,8e3,7350].indexOf(t),a=i,r="";r+=e.toString(2).padStart(5,"0"),r+=s.toString(2).padStart(4,"0"),15===s&&(r+=t.toString(2).padStart(24,"0")),r+=a.toString(2).padStart(4,"0");let n=8*Math.ceil(r.length/8);r=r.padEnd(n,"0");let o=new Uint8Array(r.length/8);for(let e=0;e<r.length;e+=8)o[e/8]=parseInt(r.slice(e,e+8),2);return o},wt=new WeakSet,gt=function(e,t,i,s,a,r,n){let o=s/1e6,l=(s-(n??0))/1e6,d=a/1e6,f=h(this,kt,Tt).call(this,o,l,e);return o=f.presentationTimestamp,l=f.decodeTimestamp,r?.decoderConfig&&(null===e.info.decoderConfig?e.info.decoderConfig=r.decoderConfig:Object.assign(e.info.decoderConfig,r.decoderConfig)),{presentationTimestamp:o,decodeTimestamp:l,duration:d,data:t,size:t.byteLength,type:i,timescaleUnitsToNextSample:O(d,e.timescale)}},bt=new WeakSet,yt=function(e,t){"fragmented"!==r(this,Je).fastStart&&e.samples.push(t);const i=O(t.presentationTimestamp-t.decodeTimestamp,e.timescale);if(null!==e.lastTimescaleUnits){let s=O(t.decodeTimestamp,e.timescale,!1),a=Math.round(s-e.lastTimescaleUnits);if(e.lastTimescaleUnits+=a,e.lastSample.timescaleUnitsToNextSample=a,"fragmented"!==r(this,Je).fastStart){let t=M(e.timeToSampleTable);1===t.sampleCount?(t.sampleDelta=a,t.sampleCount++):t.sampleDelta===a?t.sampleCount++:(t.sampleCount--,e.timeToSampleTable.push({sampleCount:2,sampleDelta:a}));const s=M(e.compositionTimeOffsetTable);s.sampleCompositionTimeOffset===i?s.sampleCount++:e.compositionTimeOffsetTable.push({sampleCount:1,sampleCompositionTimeOffset:i})}}else e.lastTimescaleUnits=0,"fragmented"!==r(this,Je).fastStart&&(e.timeToSampleTable.push({sampleCount:1,sampleDelta:O(t.duration,e.timescale)}),e.compositionTimeOffsetTable.push({sampleCount:1,sampleCompositionTimeOffset:i}));e.lastSample=t;let s=!1;if(e.currentChunk){let i=t.presentationTimestamp-e.currentChunk.startTimestamp;if("fragmented"===r(this,Je).fastStart){let a=r(this,Ye)??r(this,Ze);const n=r(this,Je).minFragmentDuration??1;e===a&&"key"===t.type&&i>=n&&(s=!0,h(this,St,xt).call(this))}else s=i>=.5}else s=!0;s&&(e.currentChunk&&h(this,Ct,vt).call(this,e),e.currentChunk={startTimestamp:t.presentationTimestamp,samples:[]}),e.currentChunk.samples.push(t)},kt=new WeakSet,Tt=function(e,t,i){const s="strict"===r(this,Je).firstTimestampBehavior,a=-1===i.lastDecodeTimestamp;if(s&&a&&0!==t)throw new Error(`The first chunk for your media track must have a timestamp of 0 (received DTS=${t}).Non-zero first timestamps are often caused by directly piping frames or audio data from a MediaStreamTrack into the encoder. Their timestamps are typically relative to the age of thedocument, which is probably what you want.\n\nIf you want to offset all timestamps of a track such that the first one is zero, set firstTimestampBehavior: 'offset' in the options.\n`);if("offset"===r(this,Je).firstTimestampBehavior||"cross-track-offset"===r(this,Je).firstTimestampBehavior){let s;void 0===i.firstDecodeTimestamp&&(i.firstDecodeTimestamp=t),s="offset"===r(this,Je).firstTimestampBehavior?i.firstDecodeTimestamp:Math.min(r(this,Ye)?.firstDecodeTimestamp??1/0,r(this,Ze)?.firstDecodeTimestamp??1/0),t-=s,e-=s}if(t<i.lastDecodeTimestamp)throw new Error(`Timestamps must be monotonically increasing (DTS went from ${1e6*i.lastDecodeTimestamp} to ${1e6*t}).`);return i.lastDecodeTimestamp=t,{presentationTimestamp:e,decodeTimestamp:t}},Ct=new WeakSet,vt=function(e){if("fragmented"===r(this,Je).fastStart)throw new Error("Can't finalize individual chunks if 'fastStart' is set to 'fragmented'.");if(e.currentChunk)if(e.finalizedChunks.push(e.currentChunk),r(this,tt).push(e.currentChunk),0!==e.compactlyCodedChunkTable.length&&M(e.compactlyCodedChunkTable).samplesPerChunk===e.currentChunk.samples.length||e.compactlyCodedChunkTable.push({firstChunk:e.finalizedChunks.length,samplesPerChunk:e.currentChunk.samples.length}),"in-memory"!==r(this,Je).fastStart){e.currentChunk.offset=r(this,Ke).pos;for(let t of e.currentChunk.samples)r(this,Ke).write(t.data),t.data=null;h(this,zt,Et).call(this)}else e.currentChunk.offset=0},St=new WeakSet,xt=function(e=!0){if("fragmented"!==r(this,Je).fastStart)throw new Error("Can't finalize a fragment unless 'fastStart' is set to 'fragmented'.");let t=[r(this,Ye),r(this,Ze)].filter(e=>e&&e.currentChunk);if(0===t.length)return;let i=(s=this,a=it,{set _(e){o(s,a,e,n)},get _(){return r(s,a,l)}})._++;var s,a,n,l;if(1===i){let e=F(t,r(this,et),!0);r(this,Ke).writeBox(e)}let d=r(this,Ke).pos,f=ce(i,t);r(this,Ke).writeBox(f);{let e=V(!1),i=0;for(let e of t)for(let t of e.currentChunk.samples)i+=t.size;let s=r(this,Ke).measureBox(e)+i;s>=2**32&&(e.largeSize=!0,s=r(this,Ke).measureBox(e)+i),e.size=s,r(this,Ke).writeBox(e)}for(let e of t){e.currentChunk.offset=r(this,Ke).pos,e.currentChunk.moofOffset=d;for(let t of e.currentChunk.samples)r(this,Ke).write(t.data),t.data=null}let u=r(this,Ke).pos;r(this,Ke).seek(r(this,Ke).offsets.get(f));let m=ce(i,t);r(this,Ke).writeBox(m),r(this,Ke).seek(u);for(let e of t)e.finalizedChunks.push(e.currentChunk),r(this,tt).push(e.currentChunk),e.currentChunk=null;e&&h(this,zt,Et).call(this)},zt=new WeakSet,Et=function(){r(this,Ke)instanceof Ge&&r(this,Ke).flush()},At=new WeakSet,Mt=function(){if(r(this,rt))throw new Error("Cannot add new video or audio chunks after the file has been finalized.")},Wt=l,((a,r,n,o)=>{if(r&&"object"==typeof r||"function"==typeof r)for(let h of i(r))s.call(a,h)||h===n||e(a,h,{get:()=>r[h],enumerable:!(o=t(r,h))||o.enumerable});return a})(e({},"__esModule",{value:!0}),Wt)})();"object"==typeof module&&"object"==typeof module.exports&&Object.assign(module.exports,Mp4Muxer);
@@ -234,7 +304,12 @@ const $ = id => document.getElementById(id);
 
 // ------------------------------------------------------------------ dados fixos
 const UF_NOMES = {AC:'Acre',AL:'Alagoas',AP:'Amapá',AM:'Amazonas',BA:'Bahia',CE:'Ceará',DF:'Distrito Federal',ES:'Espírito Santo',GO:'Goiás',MA:'Maranhão',MT:'Mato Grosso',MS:'Mato Grosso do Sul',MG:'Minas Gerais',PA:'Pará',PB:'Paraíba',PR:'Paraná',PE:'Pernambuco',PI:'Piauí',RJ:'Rio de Janeiro',RN:'Rio Grande do Norte',RS:'Rio Grande do Sul',RO:'Rondônia',RR:'Roraima',SC:'Santa Catarina',SP:'São Paulo',SE:'Sergipe',TO:'Tocantins'};
-const VARIAVEIS = {chuva_dia:['Chuva do dia','mm'],chuva_acumulado:['Chuva acumulada','mm'],tmin:['Temperatura mínima','°C'],tmax:['Temperatura máxima','°C'],nuvem:['Nuvens, média diária','%']};
+const VARIAVEIS = {chuva_dia:['Chuva do dia','mm'],chuva_acumulado:['Chuva acumulada','mm'],tmin:['Temperatura mínima','°C'],tmax:['Temperatura máxima','°C'],nuvem:['Nuvens, média diária','%'],
+  mes_chuva:['Chuva prevista no mês','mm'],mes_temp:['Temperatura média prevista','°C'],mes_anom_chuva:['Anomalia de chuva prevista','mm'],mes_anom_temp:['Anomalia de temperatura prevista','°C']};
+const RE_SAZONAL = /^sazonal_(.+?)_(anom_chuva|anom_temp|chuva|temp)_(\d{4}-\d{2})\.png$/i;
+const RE_SAZONAL_TRI = /^sazonal_(.+?)_(anom_chuva|anom_temp|chuva|temp)_tri_(\d{4}-\d{2})_a_(\d{4}-\d{2})\.png$/i;
+const BASE_MENSAL = 'proximos-meses';
+const MESES_LONGOS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 const RE_MAPA = /^ecmwf_(.+)_(chuva_dia|chuva_acumulado|tmin|tmax|nuvem)_(\d{1,2})d_(\d{4}-\d{2}-\d{2})(?:_a_(\d{4}-\d{2}-\d{2}))?\.png$/i;
 const RE_LEGADO = /^ecmwf_(chuva_dia|chuva_acumulado|tmin|tmax|nuvem)_(\d{1,2})d\.png$/i;
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -270,21 +345,49 @@ function montarCatalogo(entradas) {
     if (!nome) continue;
     const dir = partes.join('/');
     if (nome === 'regiao.json') { infos.set(dir, e); continue; }
-    let m = RE_MAPA.exec(nome), alvo, tipo, dia, base;
+    let m = RE_SAZONAL_TRI.exec(nome), alvo, tipo, dia, base;
+    if (m) {  // trimestre dos próximos 3 meses: vira o quadro final da animação mensal
+      const r = regiaoDe(regioes, dir, m[1]); tipo = 'mes_' + m[2].toLowerCase();
+      if (!r.trimestre) r.trimestre = new Map();
+      r.trimestre.set(tipo, {ent: e, de: m[3], ate: m[4]}); total++; continue;
+    }
+    if ((m = RE_SAZONAL.exec(nome))) {  // um dos 3 meses: o índice do quadro sai depois, em ordem de mês
+      const r = regiaoDe(regioes, dir, m[1]); tipo = 'mes_' + m[2].toLowerCase();
+      if (!r.meses) r.meses = new Map();
+      if (!r.meses.has(tipo)) r.meses.set(tipo, new Map());
+      e.mes = m[3]; r.meses.get(tipo).set(m[3], e); total++; continue;
+    }
+    m = RE_MAPA.exec(nome);
     if (m) { alvo = m[1]; tipo = m[2].toLowerCase(); dia = Number(m[3]); base = m[5] ? m[4] : somaDias(m[4], -dia); }
     else if ((m = RE_LEGADO.exec(nome))) { alvo = ''; tipo = m[1].toLowerCase(); dia = Number(m[2]); base = SEM_DATA; }
     else continue;
-    const chave = dir + '\u0000' + alvo;
-    let r = regioes.get(chave);
-    if (!r) { r = {chave, dir, alvo, series: new Map()}; regioes.set(chave, r); }
+    const r = regiaoDe(regioes, dir, alvo);
     if (!r.series.has(tipo)) r.series.set(tipo, new Map());
     const porBase = r.series.get(tipo);
     if (!porBase.has(base)) porBase.set(base, new Map());
     porBase.get(base).set(dia, e);
     bases.add(base); total++;
   }
+  for (const r of regioes.values()) {  // meses em ordem: 0, 1, 2
+    for (const [tipo, porMes] of r.meses || []) {
+      const serie = new Map();
+      [...porMes.keys()].sort().forEach((mes, i) => serie.set(i, porMes.get(mes)));
+      r.series.set(tipo, new Map([[BASE_MENSAL, serie]])); bases.add(BASE_MENSAL);
+    }
+  }
   return {regioes: [...regioes.values()], infos, bases, total};
 }
+
+function regiaoDe(regioes, dir, alvo) {
+  const chave = dir + '\u0000' + alvo;
+  let r = regioes.get(chave);
+  if (!r) { r = {chave, dir, alvo, series: new Map()}; regioes.set(chave, r); }
+  return r;
+}
+const ehData = b => /^\d{4}-\d{2}-\d{2}$/.test(b);
+const rotuloMes = ym => { const [a, m] = ym.split('-'); return MESES_LONGOS[Number(m) - 1] + '/' + a; };
+const rotuloMesCurto = ym => MESES[Number(ym.split('-')[1]) - 1];
+const rotuloBase = (b, ano) => b === SEM_DATA ? 'Sem data no nome' : b === BASE_MENSAL ? 'Próximos 3 meses' : rotuloData(b, ano);
 
 async function nomearRegioes(regioes, infos) {
   // Pasta raiz comum (ex.: "previsao_regioes/") sai do caminho dentro do .zip de GIFs.
@@ -444,7 +547,7 @@ const tiposDe = r => Object.keys(VARIAVEIS).filter(t => r.series.get(t) && r.ser
 
 function montarBases() {
   const sel = $('sel-base'); sel.replaceChildren();
-  for (const b of est.bases) sel.add(opcao(b, b === SEM_DATA ? 'Sem data no nome' : rotuloData(b, true)));
+  for (const b of est.bases) sel.add(opcao(b, rotuloBase(b, true)));
   sel.value = est.base; $('campo-base').hidden = est.bases.length < 2;
 }
 
@@ -465,7 +568,7 @@ function montarEstados(preferido) {
   const n = lista.length;
   $('resumo').innerHTML = '';
   const b = document.createElement('strong'); b.textContent = fmt(est.totalMapas) + ' mapas';
-  $('resumo').append(b, document.createTextNode(` de ${fmt(n)} áreas` + (est.base !== SEM_DATA ? ` · previsão de ${rotuloData(est.base, true)}` : '') + '. '));
+  $('resumo').append(b, document.createTextNode(` de ${fmt(n)} áreas` + (est.base === BASE_MENSAL ? ' · próximos 3 meses' : ehData(est.base) ? ` · previsão de ${rotuloData(est.base, true)}` : '') + '. '));
   const trocar = document.createElement('button'); trocar.type = 'button'; trocar.textContent = 'Trocar pasta';
   trocar.addEventListener('click', () => $('in-pasta').click());
   $('resumo').append(trocar);
@@ -529,7 +632,12 @@ function liberarQuadros() {
 
 // Mapa de chuva acumulada até o último dia da animação (último quadro).
 function entradaAcumulado(r, tipo, dias) {
-  if (!r || tipo === 'chuva_acumulado' || !dias.length) return null;
+  if (!r || !dias.length) return null;
+  if (tipo.startsWith('mes_')) {  // mapas mensais: o trimestre do mesmo produto
+    const t = r.trimestre && r.trimestre.get(tipo);
+    return t ? {dia: 'tri', ent: t.ent, tri: t} : null;
+  }
+  if (tipo === 'chuva_acumulado') return null;
   const porDia = r.series.get('chuva_acumulado') && r.series.get('chuva_acumulado').get(est.base);
   if (!porDia) return null;
   const ultimo = Math.max(...dias), dia = [...porDia.keys()].filter(d => d <= ultimo).sort((a, b) => b - a)[0];
@@ -548,21 +656,23 @@ async function prepararAcumulado() {
       if (versao !== est.versao) { bmp && bmp.close && bmp.close(); return; }
       if (bmp) est.acumCache.set(chave, bmp);
     }
-    if (bmp) acum = {dia: alvo.dia, bmp, acumulado: true};
+    if (bmp) acum = {dia: alvo.dia, bmp, ent: alvo.ent, tri: alvo.tri, acumulado: true};
   }
   est.acum = acum;
   $('linha-acum').hidden = !acum;
-  $('nota-acum').textContent = acum && est.base !== SEM_DATA
-    ? `Último quadro: ${rotuloData(est.base)} a ${rotuloData(somaDias(est.base, acum.dia))}` : '';
+  $('txt-acum').textContent = acum && acum.tri ? 'Terminar com o trimestre' : 'Terminar com a chuva acumulada';
+  $('nota-acum').textContent = !acum ? '' : acum.tri ? `Último quadro: ${periodoTri(acum.tri)}`
+    : ehData(est.base) ? `Último quadro: ${rotuloData(est.base)} a ${rotuloData(somaDias(est.base, acum.dia))}` : '';
 }
+const periodoTri = t => `${rotuloMesCurto(t.de)} a ${rotuloMesCurto(t.ate)}/${t.ate.slice(2, 4)}`;
 const usarAcum = () => !!(est.acum && $('chk-acum').checked);
 
 async function decodificar(lista) {
   const saida = [];
   try {
-    for (const q of lista) {
-      const blob = await q.ent.obter();
-      saida.push({dia: q.dia, bmp: await createImageBitmap(blob)});
+    const blobs = await Promise.all(lista.map(q => q.ent.obter()));  // do GitHub, vários ao mesmo tempo
+    for (const [i, q] of lista.entries()) {
+      saida.push({dia: q.dia, ent: q.ent, mes: q.ent.mes, bmp: await createImageBitmap(blobs[i])});
     }
   } catch (e) {
     for (const q of saida) q.bmp.close && q.bmp.close();
@@ -571,7 +681,7 @@ async function decodificar(lista) {
   return saida;
 }
 
-const dataDoDia = dia => est.base === SEM_DATA ? null : somaDias(est.base, dia);
+const dataDoDia = dia => ehData(est.base) ? somaDias(est.base, dia) : null;
 const incluidos = () => (est.quadros || []).filter(q => !est.diasFora.has(q.dia));
 const sequencia = () => { const l = incluidos(); return l.length && usarAcum() ? [...l, est.acum] : l; };
 const chaveQuadro = q => q.acumulado ? 'acum' : String(q.dia);
@@ -625,9 +735,10 @@ function montarFita() {
   const fita = $('fita'); fita.replaceChildren();
   if (est.acum) {  // cartão do acumulado no fim da fita
     const b = document.createElement('button'); b.type = 'button'; b.className = 'quadro'; b.dataset.chave = 'acum';
-    const d1 = document.createElement('span'); d1.className = 'dia'; d1.textContent = 'Acumulado';
+    const d1 = document.createElement('span'); d1.className = 'dia'; d1.textContent = est.acum.tri ? 'Trimestre' : 'Acumulado';
     const d2 = document.createElement('span'); d2.className = 'data';
-    d2.textContent = est.base !== SEM_DATA ? `${rotuloData(est.base)} a ${rotuloData(somaDias(est.base, est.acum.dia))}` : 'período';
+    d2.textContent = est.acum.tri ? periodoTri(est.acum.tri)
+      : ehData(est.base) ? `${rotuloData(est.base)} a ${rotuloData(somaDias(est.base, est.acum.dia))}` : 'período';
     b.append(miniatura(est.acum.bmp), d1, d2);
     b.setAttribute('aria-pressed', String($('chk-acum').checked));
     b.setAttribute('aria-label', 'Chuva acumulada no último quadro' + ($('chk-acum').checked ? ', na animação' : ', fora da animação'));
@@ -639,11 +750,12 @@ function montarFita() {
     const c = miniatura(q.bmp);
     const iso = dataDoDia(q.dia), hoje = q.dia === 0;
     const d1 = document.createElement('span'); d1.className = 'dia';
-    d1.textContent = iso ? (hoje ? 'Hoje, ' : '') + diaSemana(iso) : 'Dia ' + q.dia;
-    const d2 = document.createElement('span'); d2.className = 'data'; d2.textContent = iso ? rotuloData(iso) : '+' + q.dia + ' d';
+    d1.textContent = q.mes ? rotuloMes(q.mes).split('/')[0] : iso ? (hoje ? 'Hoje, ' : '') + diaSemana(iso) : 'Dia ' + q.dia;
+    const d2 = document.createElement('span'); d2.className = 'data';
+    d2.textContent = q.mes ? q.mes.slice(0, 4) : iso ? rotuloData(iso) : '+' + q.dia + ' d';
     b.append(c, d1, d2);
     b.setAttribute('aria-pressed', String(!est.diasFora.has(q.dia)));
-    b.setAttribute('aria-label', (iso ? diaSemana(iso) + ' ' + rotuloData(iso, true) : 'Dia ' + q.dia) + (est.diasFora.has(q.dia) ? ', fora da animação' : ', na animação'));
+    b.setAttribute('aria-label', (q.mes ? rotuloMes(q.mes) : iso ? diaSemana(iso) + ' ' + rotuloData(iso, true) : 'Dia ' + q.dia) + (est.diasFora.has(q.dia) ? ', fora da animação' : ', na animação'));
     b.addEventListener('click', async () => {
       if (est.ocupado) return;
       est.diasFora.has(q.dia) ? est.diasFora.delete(q.dia) : est.diasFora.add(q.dia);
@@ -821,9 +933,20 @@ const FORMATOS = {
   gif: {ext: 'gif', mime: 'image/gif', nome: 'GIF', artigo: 'o GIF', zip: 'gifs'},
   mp4: {ext: 'mp4', mime: 'video/mp4', nome: 'MP4', artigo: 'o vídeo', zip: 'videos'},
   webm: {ext: 'webm', mime: 'video/webm', nome: 'WebM', artigo: 'o vídeo', zip: 'videos'},
+  png: {ext: 'zip', mime: 'application/zip', nome: 'imagens', artigo: 'o .zip', zip: 'imagens'},
 };
+const nomeBase = ent => ent.caminho.split('/').pop();
+async function zipDeImagens(quadros, zip, pasta = '') {
+  for (const q of quadros) zip.adicionar(pasta + nomeBase(q.ent), new Uint8Array(await (await q.ent.obter()).arrayBuffer()));
+}
 const formatoAtual = () => document.querySelector('input[name="formato"]:checked').value;
-const nomeArquivo = (r, tipo, formato) => `ecmwf_${r.prefixo}_${tipo}_${est.base}.${FORMATOS[formato].ext}`;
+const nomeArquivo = (r, tipo, formato) => {
+  if (est.base === BASE_MENSAL) {  // mapas mensais: sazonal_<área>_<produto>_<primeiro mês>_a_<último>
+    const meses = [...(r.series.get(tipo) && r.series.get(tipo).get(BASE_MENSAL) || new Map()).values()].map(e => e.mes).filter(Boolean).sort();
+    return `sazonal_${r.prefixo}_${tipo.replace(/^mes_/, '')}_${meses.length ? meses[0] + '_a_' + meses[meses.length - 1] : 'proximos_meses'}.${FORMATOS[formato].ext}`;
+  }
+  return `ecmwf_${r.prefixo}_${tipo}_${est.base}.${FORMATOS[formato].ext}`;
+};
 
 // ------------------------------------------------------------------ vídeo (WebCodecs + muxers embutidos)
 const FPS = 30;
@@ -897,7 +1020,8 @@ async function detectarFormatos() {
 function aplicarFormato() {
   const f = formatoAtual(), F = FORMATOS[f];
   $('campo-rep').hidden = f !== 'gif';
-  $('criar').textContent = f === 'gif' ? 'Criar GIF' : 'Criar vídeo';
+  $('opcoes-animacao').hidden = f === 'png';  // imagens originais: sem tempo, pausa ou largura
+  $('criar').textContent = f === 'gif' ? 'Criar GIF' : f === 'png' ? 'Juntar imagens' : 'Criar vídeo';
   if (!est.resultadoURL) $('baixar').textContent = 'Baixar ' + F.nome;
 }
 
@@ -958,18 +1082,24 @@ async function criarUm() {
   try {
     const avanco = f => status(`Montando ${F.artigo}… ${Math.round(f * 100)}%`);
     avanco(0);
-    const res = formato === 'gif' ? await criarGifBlob(lista, opcoesAtuais(), avanco)
+    let res;
+    if (formato === 'png') {
+      const zip = new Zip(); await zipDeImagens(lista, zip); const z = zip.blob();
+      res = {bytes: new Uint8Array(await z.arrayBuffer()), W: 0, H: 0, imagens: lista.length};
+    } else res = formato === 'gif' ? await criarGifBlob(lista, opcoesAtuais(), avanco)
       : await criarVideoBlob(lista, opcoesAtuais(), formato, avanco);
     const blob = new Blob([res.bytes], {type: F.mime});
     est.resultadoURL = URL.createObjectURL(blob);
     pararAnimacao();
     const descr = `${est.regiao.rotulo}: ${VARIAVEIS[est.tipo][0]}, animação de ${incluidos().length} dias` + (usarAcum() ? ' e chuva acumulada no fim' : '');
     $('previa').hidden = true; $('tocar').hidden = true;
-    if (formato === 'gif') { const img = $('gif'); img.src = est.resultadoURL; img.alt = descr; img.hidden = false; }
+    if (formato === 'png') { $('previa').hidden = false; }
+    else if (formato === 'gif') { const img = $('gif'); img.src = est.resultadoURL; img.alt = descr; img.hidden = false; }
     else { const v = $('video'); v.src = est.resultadoURL; v.setAttribute('aria-label', descr); v.hidden = false; v.play().catch(() => {}); }
     for (const b of $('fita').children) b.classList.remove('atual');
     const dur = res.segundos ? `, ${String(Math.round(res.segundos * 10) / 10).replace('.', ',')} s` : '';
-    $('selo').textContent = `${F.nome} pronto, ${res.W}×${res.H} px${dur}, ${kb(blob.size)}`; $('selo').classList.add('pronto');
+    $('selo').textContent = res.imagens ? `${res.imagens} imagens prontas, ${kb(blob.size)}` : `${F.nome} pronto, ${res.W}×${res.H} px${dur}, ${kb(blob.size)}`;
+    $('selo').classList.add('pronto');
     const a = $('baixar'); a.href = est.resultadoURL; a.download = nomeArquivo(est.regiao, est.tipo, formato); a.setAttribute('aria-disabled', 'false'); a.textContent = `Baixar ${F.nome} (${kb(blob.size)})`;
     est.ocupado = false; atualizarBotoes();
     status('Pronto. Mudou alguma opção? Crie de novo para atualizar.');
@@ -991,21 +1121,32 @@ async function criarLote() {
   $('progresso').hidden = false; $('barra').style.width = '0';
   const zip = new Zip(), falhas = [], opcoes = opcoesAtuais(), formato = formatoAtual(), F = FORMATOS[formato];
   const comAcum = $('chk-acum').checked;
+  let imagensOk = 0;
   let feitos = 0, bytes = 0;
   for (const [r, tipo] of tarefas) {
     if (est.cancelar) break;
     $('progresso-txt').textContent = `${feitos + 1} de ${tarefas.length}: ${r.rotulo}, ${VARIAVEIS[tipo][0].toLowerCase()} (${kb(bytes)} até agora)`;
     let bmps = [];
     try {
+      const pasta = r.rel ? r.rel.replace(/\/+$/, '') + '/' : '';
+      if (formato === 'png') {  // imagens originais: sem desenhar nada
+        const qs = quadrosDaSerie(r, tipo).filter(q => !est.diasFora.has(q.dia));
+        const fim = comAcum && qs.length ? entradaAcumulado(r, tipo, qs.map(q => q.dia)) : null;
+        await zipDeImagens(fim ? [...qs, fim] : qs, zip, pasta);
+        bytes = zip.pos; imagensOk++;
+      } else {
       bmps = await decodificar(quadrosDaSerie(r, tipo).filter(q => !est.diasFora.has(q.dia)));
       const acum = comAcum && bmps.length ? entradaAcumulado(r, tipo, bmps.map(b => b.dia)) : null;
       if (acum) bmps.push({dia: acum.dia, bmp: await createImageBitmap(await acum.ent.obter()), acumulado: true});
       if (bmps.length < 2) throw new Error('menos de 2 dias disponíveis');
       const barra = f => { $('barra').style.width = ((feitos + f) / tarefas.length * 100).toFixed(1) + '%'; };
       const res = formato === 'gif' ? await criarGifBlob(bmps, opcoes, barra) : await criarVideoBlob(bmps, opcoes, formato, barra);
-      const pasta = r.rel ? r.rel.replace(/\/+$/, '') + '/' : '';
       zip.adicionar(pasta + nomeArquivo(r, tipo, formato), res.bytes); bytes += res.bytes.length;
-    } catch (e) { falhas.push(`${r.rotulo} — ${VARIAVEIS[tipo][0]}: ${e.message || e}`); }
+      }
+    } catch (e) {
+      falhas.push(`${r.rotulo} — ${VARIAVEIS[tipo][0]}: ${e.message || e}`);
+      if (/limite de pedidos/.test(e.message || '')) est.cancelar = true;  // GitHub: não adianta continuar
+    }
     finally { for (const b of bmps) b.bmp.close && b.bmp.close(); }
     feitos++; $('barra').style.width = (feitos / tarefas.length * 100).toFixed(1) + '%';
     await folga();
@@ -1016,14 +1157,203 @@ async function criarLote() {
   if (zip.n > (falhas.length ? 1 : 0)) {
     const blob = zip.blob(); est.loteURL = URL.createObjectURL(blob);
     const a = $('baixar-lote'); a.href = est.loteURL; a.download = `${F.zip}_previsao_${est.base}.zip`; a.textContent = `Baixar .zip (${kb(blob.size)})`; a.hidden = false;
-    const feitosOk = zip.n - (falhas.length ? 1 : 0), plural = formato === 'gif' ? 'GIFs' : 'vídeos';
-    $('status-lote').textContent = (est.cancelar ? `Cancelado. O .zip tem os ${fmt(feitosOk)} ${plural} já prontos.` : `${fmt(feitosOk)} ${plural} prontos.`) +
+    const feitosOk = zip.n - (falhas.length ? 1 : 0), plural = formato === 'gif' ? 'GIFs' : formato === 'png' ? 'imagens' : 'vídeos';
+    const resumo = formato === 'png' ? `${fmt(feitosOk)} imagens de ${fmt(imagensOk)} séries` : `${fmt(feitosOk)} ${plural}`;
+    $('status-lote').textContent = (est.cancelar ? `Cancelado. O .zip tem ${resumo} já prontos.` : `${resumo} prontos.`) +
       (falhas.length ? ` ${falhas.length} não saíram; a lista está em ${listaFalhas}.` : '');
     a.click();
   } else {
     $('status-lote').textContent = est.cancelar ? 'Cancelado antes do primeiro arquivo.' : 'Nada saiu. ' + (falhas[0] || '');
   }
   est.ocupado = false; atualizarBotoes();
+}
+
+// ------------------------------------------------------------------ GitHub: abrir os ramos e rodar os workflows
+const GH = {api: 'https://api.github.com', repo: '', token: '', login: '', ramoPadrao: 'main', restante: null};
+const RAMOS = [{ramo: 'mapas', nome: 'Mapas diários'}, {ramo: 'pontos', nome: 'Pontos'}, {ramo: 'mensal', nome: 'Próximos 3 meses'}];
+const WORKFLOWS = {ponto: 'previsao_ponto.yml', mensal: 'previsao_mensal.yml', diario: 'previsao_regioes.yml'};
+const RAMO_DO_TIPO = {ponto: 'pontos', mensal: 'mensal', diario: 'mapas'};
+const CHAVE_GH = 'gifs_previsao_github';
+const dormir = ms => new Promise(ok => setTimeout(ok, ms));
+class ErroGH extends Error { constructor(status, msg) { super(msg); this.status = status; } }
+
+function explicarGH(status, msg) {
+  const m = (msg || '').toLowerCase();
+  if (status === 401) return 'o GitHub não aceitou o token. Confira se ele foi copiado inteiro e se não expirou.';
+  if (status === 403 && m.includes('rate limit')) return 'o limite de pedidos do GitHub acabou por agora (5.000 por hora). Tente de novo mais tarde.';
+  if (status === 403) return 'o token não tem permissão para isso. Ele precisa de Actions: Read and write e Contents: Read-only neste repositório.';
+  if (status === 404) return 'não encontrado. Confira o repositório (usuario/repositorio) e se o token tem acesso a ele.';
+  if (status === 422) return 'o GitHub recusou o pedido (' + (msg || 'dados inválidos') + ').';
+  return msg || ('erro ' + status + ' do GitHub');
+}
+
+async function gh(caminho, opc = {}) {
+  let r;
+  try {
+    r = await fetch(GH.api.replace(/\/+$/, '') + caminho, {...opc, headers: {Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28', ...(GH.token ? {Authorization: 'Bearer ' + GH.token} : {}), ...(opc.headers || {})}});
+  } catch (e) { throw new ErroGH(0, 'sem conexão com o GitHub (' + e.message + ')'); }
+  const resto = r.headers.get('x-ratelimit-remaining');
+  if (resto !== null) GH.restante = Number(resto);
+  if (!r.ok) { let msg = ''; try { msg = (await r.json()).message || ''; } catch {} throw new ErroGH(r.status, explicarGH(r.status, msg)); }
+  return r;
+}
+const ghJson = async (c, o) => (await gh(c, o)).json();
+const repoPath = () => '/repos/' + GH.repo.split('/').map(encodeURIComponent).join('/');
+
+// Imagens: no máximo 4 pedidos ao mesmo tempo e um cache pequeno, para não gastar o limite à toa.
+const cacheBlobs = new Map(), filaGH = [];
+let ativosGH = 0;
+async function comVaga(fn) {
+  if (ativosGH >= 4) await new Promise(ok => filaGH.push(ok));
+  ativosGH++;
+  try { return await fn(); } finally { ativosGH--; const prox = filaGH.shift(); if (prox) prox(); }
+}
+async function blobGH(sha, caminho) {
+  if (cacheBlobs.has(sha)) { const b = cacheBlobs.get(sha); cacheBlobs.delete(sha); cacheBlobs.set(sha, b); return b; }
+  const r = await comVaga(() => gh(`${repoPath()}/git/blobs/${sha}`, {headers: {Accept: 'application/vnd.github.raw'}}));
+  const b = new Blob([await r.arrayBuffer()], {type: /\.png$/i.test(caminho) ? 'image/png' : 'application/json'});
+  cacheBlobs.set(sha, b);
+  while (cacheBlobs.size > 300) cacheBlobs.delete(cacheBlobs.keys().next().value);
+  return b;
+}
+async function entradasDoGitHub(ramo) {
+  const j = await ghJson(`${repoPath()}/git/trees/${encodeURIComponent(ramo)}?recursive=1`);
+  return (j.tree || []).filter(it => it.type === 'blob' && /\.(png|json)$/i.test(it.path))
+    .map(it => ({caminho: it.path, obter: () => blobGH(it.sha, it.path)}));
+}
+
+function ghStatus(txt, ruim) { $('gh-status').textContent = txt; $('gh-status').classList.toggle('ruim', !!ruim); }
+function execEstado(txt, ruim) { $('gh-exec-estado').textContent = txt; $('gh-exec-estado').style.color = ruim ? '#9b2c1f' : ''; }
+
+function carregarConfigGH() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CHAVE_GH) || '{}');
+    if (c.api) $('gh-api').value = c.api;
+    if (c.repo && !$('gh-repo').value) $('gh-repo').value = c.repo;
+    if (c.token && !$('gh-token').value) { $('gh-token').value = c.token; $('gh-lembrar').checked = true; }
+  } catch {}
+}
+function salvarGH() {
+  try {
+    const lembrar = $('gh-lembrar').checked;
+    localStorage.setItem(CHAVE_GH, JSON.stringify({api: GH.api, repo: GH.repo, ...(lembrar && GH.token ? {token: GH.token} : {})}));
+  } catch {}
+}
+
+async function conectarGH() {
+  GH.api = $('gh-api').value.trim() || 'https://api.github.com';
+  GH.repo = $('gh-repo').value.trim().replace(/^https?:\/\/[^/]+\//i, '').replace(/\.git$/i, '').replace(/\/+$/, '');
+  GH.token = $('gh-token').value.trim();
+  if (!/^[^/\s]+\/[^/\s]+$/.test(GH.repo)) { ghStatus('Informe o repositório como usuario/repositorio.', true); return false; }
+  if (!GH.token) { ghStatus('Cole o token de acesso.', true); return false; }
+  $('gh-conectar').disabled = true; ghStatus('Conectando…');
+  try {
+    const repo = await ghJson(repoPath());
+    GH.ramoPadrao = repo.default_branch || 'main';
+    try { GH.login = (await ghJson('/user')).login || ''; } catch { GH.login = ''; }
+    salvarGH();
+    ghStatus(`Conectado${GH.login ? ' como ' + GH.login : ''} a ${repo.full_name || GH.repo}.`);
+    await listarRamos();
+    $('gh-bloco-abrir').hidden = false; $('gh-bloco-rodar').hidden = false;
+    return true;
+  } catch (e) { ghStatus('Não conectou: ' + e.message, true); return false; }
+  finally { $('gh-conectar').disabled = false; }
+}
+
+async function listarRamos() {
+  const caixa = $('gh-ramos'); caixa.replaceChildren();
+  for (const R of RAMOS) {
+    let info = 'ainda não existe no repositório', existe = false;
+    try {
+      const j = await ghJson(`${repoPath()}/branches/${encodeURIComponent(R.ramo)}`);
+      info = 'atualizado em ' + new Date(j.commit.commit.committer.date).toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short'});
+      existe = true;
+    } catch (e) { if (e.status !== 404) info = e.message; }
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'gh-ramo'; b.disabled = !existe;
+    const t = document.createElement('div'), forte = document.createElement('strong'), sub = document.createElement('small');
+    forte.textContent = R.nome; sub.textContent = `ramo ${R.ramo}, ${info}`; t.append(forte, sub);
+    const ir = document.createElement('span'); ir.className = 'ir'; ir.textContent = existe ? 'Abrir' : '';
+    b.append(t, ir); b.addEventListener('click', () => abrirRamo(R.ramo));
+    caixa.append(b);
+  }
+}
+
+async function abrirRamo(ramo, depois) {
+  $('dlg-gh').close();
+  await carregar(() => entradasDoGitHub(ramo));
+  if (depois && !$('app').hidden) await depois();
+}
+
+function aplicarTipoGH() {
+  const t = document.querySelector('input[name="gh-tipo"]:checked').value;
+  $('gh-form-ponto').hidden = t !== 'ponto'; $('gh-form-mensal').hidden = t !== 'mensal'; $('gh-form-diario').hidden = t !== 'diario';
+}
+
+async function rodarGH() {
+  const tipo = document.querySelector('input[name="gh-tipo"]:checked').value, arquivo = WORKFLOWS[tipo];
+  let inputs = {};
+  $('gh-exec').hidden = false; $('gh-exec-passo').textContent = ''; $('gh-exec-link').removeAttribute('href');
+  if (tipo === 'ponto') {
+    const nome = $('gh-nome').value.trim(), coordenada = $('gh-coord').value.trim();
+    if (!nome || !coordenada) { execEstado('Preencha o nome do ponto e a coordenada.', true); return; }
+    inputs = {nome, coordenada, raio: ($('gh-raio').value.trim() || '150').replace(',', '.')};
+  } else if (tipo === 'mensal') {
+    const mes = $('gh-mes').value.trim();
+    if (mes && !/^\d{4}-\d{2}$/.test(mes)) { execEstado('Escreva o mês como AAAA-MM, por exemplo 2026-10.', true); return; }
+    inputs = {mes_inicio: mes, anomalia: String($('gh-anomalia').checked)};
+  }
+  $('gh-rodar').disabled = true; execEstado('Enviando para o GitHub…');
+  try {
+    const t0 = Date.now() - 60000;  // folga para diferença de relógio
+    const r = await gh(`${repoPath()}/actions/workflows/${arquivo}/dispatches`, {method: 'POST',
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ref: GH.ramoPadrao, inputs})});
+    let runId = null;
+    if (r.status === 200) { try { runId = (await r.json()).workflow_run_id || null; } catch {} }
+    execEstado('Na fila do GitHub…');
+    const run = await acompanharGH(arquivo, runId, t0);
+    if (run.conclusion === 'success') {
+      execEstado('Concluído. Abrindo os mapas…');
+      await abrirRamo(RAMO_DO_TIPO[tipo], tipo === 'ponto' ? () => selecionarPonto(inputs.nome) : null);
+    } else {
+      execEstado(run.conclusion === 'cancelled' ? 'A execução foi cancelada.' : 'Terminou com erro. Abra no GitHub para ver o passo que falhou.', true);
+    }
+  } catch (e) { execEstado('Não rodou: ' + e.message, true); }
+  finally { $('gh-rodar').disabled = false; }
+}
+
+async function acompanharGH(arquivo, runId, t0) {
+  let run = null;
+  for (let i = 0; !run && i < 40; i++) {  // a execução leva alguns segundos para aparecer
+    if (runId) { run = await ghJson(`${repoPath()}/actions/runs/${runId}`); break; }
+    await dormir(3000);
+    const j = await ghJson(`${repoPath()}/actions/workflows/${arquivo}/runs?event=workflow_dispatch&per_page=10`);
+    run = (j.workflow_runs || []).filter(w => new Date(w.created_at).getTime() >= t0 &&
+      (!GH.login || !w.actor || w.actor.login === GH.login)).sort((a, b) => b.id - a.id)[0] || null;
+  }
+  if (!run) throw new Error('a execução não apareceu na lista do GitHub. Veja em Actions.');
+  $('gh-exec-link').href = run.html_url || '#';
+  const inicio = Date.now();
+  for (let n = 0; run.status !== 'completed'; n++) {
+    if (run.status === 'in_progress' && n % 2 === 0) {
+      try {
+        const passos = ((await ghJson(`${repoPath()}/actions/runs/${run.id}/jobs`)).jobs || []).flatMap(j => j.steps || []);
+        const atual = passos.find(p => p.status === 'in_progress');
+        if (atual) $('gh-exec-passo').textContent = `Passo ${passos.indexOf(atual) + 1} de ${passos.length}: ${atual.name}`;
+      } catch {}
+    }
+    const min = Math.floor((Date.now() - inicio) / 60000);
+    execEstado((run.status === 'in_progress' ? 'Rodando' : 'Na fila do GitHub') + (min ? ` (${min} min)` : ''));
+    await dormir(10000);
+    run = await ghJson(`${repoPath()}/actions/runs/${run.id}`);
+  }
+  return run;
+}
+
+function selecionarPonto(nome) {
+  const alvo = est.regioes.find(r => r.tipo === 'ponto' && r.nome.toLowerCase() === nome.replace(/\s+/g, ' ').trim().toLowerCase());
+  if (!alvo || ![...$('sel-estado').options].some(o => o.value === 'PONTOS')) return;
+  $('sel-estado').value = 'PONTOS'; montarAreas(alvo.chave); trocarSerie();
 }
 
 // ------------------------------------------------------------------ preferências e eventos
@@ -1037,6 +1367,17 @@ try {
 const salvarPrefs = () => { try { localStorage.setItem('gifs_previsao', JSON.stringify({...Object.fromEntries(PREFS.map(id => [id, $(id).value])), formato: formatoAtual(), acumulado: $('chk-acum').checked})); } catch {} };
 
 for (const b of document.querySelectorAll('[data-abre]')) b.addEventListener('click', () => $(b.dataset.abre === 'zip' ? 'in-zip' : 'in-pasta').click());
+for (const b of document.querySelectorAll('[data-gh]')) b.addEventListener('click', () => {
+  carregarConfigGH(); $('dlg-gh').showModal();
+  if ($('gh-token').value && $('gh-repo').value && $('gh-bloco-abrir').hidden) conectarGH();
+});
+$('gh-conectar').addEventListener('click', conectarGH);
+$('gh-esquecer').addEventListener('click', () => {
+  GH.token = ''; $('gh-token').value = ''; $('gh-lembrar').checked = false; salvarGH();
+  $('gh-bloco-abrir').hidden = true; $('gh-bloco-rodar').hidden = true; ghStatus('Token apagado deste computador.');
+});
+for (const r of document.querySelectorAll('input[name="gh-tipo"]')) r.addEventListener('change', aplicarTipoGH);
+$('gh-rodar').addEventListener('click', rodarGH);
 $('in-pasta').addEventListener('change', e => { const f = e.target.files; if (f && f.length) carregar(async () => entradasDeArquivos(f)); e.target.value = ''; });
 $('in-zip').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) carregar(() => entradasDoZip(f)); e.target.value = ''; });
 

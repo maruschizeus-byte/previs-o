@@ -405,6 +405,8 @@ def uf_sigla(regiao, estados=None):
     dígitos); 4) geometria: centro dentro de qual estado do fundo."""
     if regiao.get("tipo") == "regiao":  # região do Brasil: vários estados
         return None
+    if regiao.get("tipo") == "ponto":   # mapa em volta de um ponto: UF onde ele cai
+        return regiao.get("uf")
     c = regiao.get("campos", {})
     for k in ("sigla_uf", "sigla", "uf", "cd_uf_sigla"):
         v = c.get(k, "").strip()
@@ -437,8 +439,12 @@ def uf_sigla(regiao, estados=None):
 
 
 def _pasta_segura(nome):
-    """Nome de pasta legível e seguro (troca / por -, tira pontas ruins)."""
-    s = (nome or "").replace("/", "-").replace("\\", "-").strip().strip(".")
+    """Nome de pasta legível e válido também no Windows: troca / \\ : * ? " < > | #
+    por -, tira pontas ruins e evita nomes reservados (CON, PRN, NUL, COM1...)."""
+    s = re.sub(r'[<>:"/\\|?*#\x00-\x1f]', "-", nome or "")
+    s = re.sub(r"\s+", " ", s).strip().strip(".").strip()
+    if re.fullmatch(r"(?i)(con|prn|aux|nul|com[1-9]|lpt[1-9])", s):
+        s += "_"
     return s or "sem_nome"
 
 
@@ -481,6 +487,9 @@ def preparar_pastas(alvos, saida, estados):
         }
         if regiao and regiao.get("tipo") == "regiao":
             registro["ufs"] = regiao.get("ufs") or []
+        if regiao and regiao.get("tipo") == "ponto":
+            registro.update(lat=regiao["pontos"][0]["lat"], lon=regiao["pontos"][0]["lon"],
+                            raio_km=regiao["raio_km"])
         if regiao and regiao.get("tipo") == "grupo":
             registro["grupo"] = regiao.get("grupo") or regiao["nome"]
             registro["pontos"] = regiao.get("pontos") or []
@@ -641,6 +650,8 @@ REGIOES_BRASIL = {  # regiões do IBGE, na ordem em que aparecem nas ferramentas
     "Sul": ["PR", "RS", "SC"],
 }
 
+RAIO_PONTO_KM = 150  # mapas em volta de um ponto: quadro de 150 km para cada lado
+
 GRUPOS_PADRAO = "grupos.json"
 POSICOES_LOGO = ("inferior-esquerda", "inferior-direita", "superior-esquerda", "superior-direita")
 
@@ -699,6 +710,71 @@ def _ler_regiao_json(pasta):
         return info if isinstance(info, dict) else None
     except (OSError, ValueError):
         return None
+
+
+def ler_coordenada(texto):
+    """Aceita '-15.601, -56.097' (como o Google Maps copia), '-15,601 -56,097' ou
+    '-15.601;-56.097'. Devolve (lat, lon, trocou): trocou=True se veio lon, lat."""
+    t = re.sub(r"[^\d.,;\s+-]+", " ", str(texto)).strip()  # ignora "LOC", "Lat:", "°"...
+    if ";" in t:
+        partes = t.split(";")
+    elif "." in t:
+        partes = re.split(r"[,\s]+", t)
+    else:
+        partes = t.split()
+    try:
+        nums = [float(p.strip().replace(",", ".")) for p in partes if re.search(r"\d", p)]
+    except ValueError:
+        nums = []
+    if len(nums) != 2:
+        raise ValueError(f"coordenada inválida: '{texto}'. Use latitude e longitude, ex.: -15.601, -56.097")
+    lat, lon = nums
+    trocou = not (-35 <= lat <= 7) and (-35 <= lon <= 7)  # no Brasil a latitude fica entre -34 e 6
+    if trocou:
+        lat, lon = lon, lat
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        raise ValueError(f"coordenada fora do globo: '{texto}'")
+    return lat, lon, trocou
+
+
+def enquadramento_ponto(lat, lon, raio_km):
+    """Quadro com raio_km para cada lado do ponto (lon, lon, lat, lat)."""
+    dlat = raio_km / 111.32
+    dlon = raio_km / (111.32 * max(math.cos(math.radians(lat)), 0.05))
+    return (lon - dlon, lon + dlon, lat - dlat, lat + dlat)
+
+
+def siglas_no_quadro(estados, extent, centro):
+    """Sigla de cada estado que aparece no quadro, no ponto livre mais longe da
+    divisa: fora do nome do ponto e do canto da logo."""
+    from matplotlib.path import Path
+    x0, x1, y0, y1 = extent
+    gx, gy = np.meshgrid(np.linspace(x0, x1, 40)[2:-2], np.linspace(y0, y1, 40)[2:-2])
+    cand = np.c_[gx.ravel(), gy.ravel()]
+    fx, fy = (cand[:, 0] - x0) / (x1 - x0), (cand[:, 1] - y0) / (y1 - y0)
+    cx, cy = (centro[0] - x0) / (x1 - x0), (centro[1] - y0) / (y1 - y0)
+    livre = ~((fx > 0.68) & (fy < 0.2))                                   # logo no canto inferior direito
+    livre &= ~((fx > cx - 0.06) & (fx < cx + 0.36) & (np.abs(fy - cy) < 0.08))  # triângulo e nome do ponto
+    escala = np.array([1 / (x1 - x0), 1 / (y1 - y0)])
+    rotulos = []
+    for r in estados:
+        uf = uf_sigla(r, estados)
+        dentro, bordas = np.zeros(len(cand), bool), []
+        for xy, a0, a1, b0, b1 in _arrays_poligonos(r):
+            if not (a1 < x0 or a0 > x1 or b1 < y0 or b0 > y1) and len(xy) >= 3:
+                dentro |= Path(xy).contains_points(cand)
+                bordas.append(xy[:: max(1, len(xy) // 1500)] * escala)
+        if not uf or dentro.sum() < 0.04 * len(cand) or not (dentro & livre).any():
+            continue
+        ok = cand[dentro & livre]
+        pts, borda = ok * escala, np.vstack(bordas)
+        a_, b_ = borda[:-1], borda[1:]
+        ab = b_ - a_
+        t = np.clip(((pts[:, None, :] - a_) * ab).sum(-1) / np.maximum((ab ** 2).sum(-1), 1e-12), 0, 1)
+        dist = np.sqrt((((a_ + t[..., None] * ab) - pts[:, None, :]) ** 2).sum(-1)).min(1)
+        lon, lat = ok[int(np.argmax(dist))]
+        rotulos.append((uf, float(lon), float(lat)))
+    return rotulos
 
 
 def remover_grupos_orfaos(saida, grupos, gerados=()):
@@ -1149,8 +1225,8 @@ def prefixo_png(regiao, estados, tipo, dias):
     """Prefixo estável por área/produto/horizonte, com caracteres portáveis."""
     if regiao is None:
         alvo = "brasil"
-    elif regiao.get("tipo") == "regiao":
-        alvo = "regiao_" + (re.sub(r"[^a-z0-9]+", "_", _sem_acento(regiao["nome"])).strip("_") or "brasil")
+    elif regiao.get("tipo") in ("regiao", "ponto"):
+        alvo = regiao["tipo"] + "_" + (re.sub(r"[^a-z0-9]+", "_", _sem_acento(regiao["nome"])).strip("_") or "sem_nome")
     else:
         uf = uf_sigla(regiao, estados)
         nome = UF_NOMES.get(uf, regiao["nome"]) if regiao.get("tipo") == "estado" else regiao["nome"]
@@ -1401,7 +1477,7 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     cs = ax.contourf(lon2d, lat2d, dados, levels=levels, cmap=cmap, norm=norm,
                      extend=extend, antialiased=True)
 
-    if recortar and regiao is not None:
+    if recortar and regiao is not None and regiao.get("poligonos"):
         clip = _caminho_poligono(regiao)
         patch = mpatches.PathPatch(clip, transform=ax.transData,
                                    facecolor="none", edgecolor="none")
@@ -1414,20 +1490,22 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
 
     # fundo: contorno fino dos ESTADOS (contexto). As outras mesorregiões não
     # entram aqui — só o fundo de estados e a região escolhida em destaque.
-    if fundo:
-        _desenhar_contornos(ax, fundo, extent, colors="black", linewidths=0.5, alpha=0.55)
+    e_ponto = regiao is not None and regiao.get("tipo") == "ponto"
+    if fundo:  # no mapa do ponto os estados são a única referência: linha mais forte
+        _desenhar_contornos(ax, fundo, extent, colors="black",
+                            linewidths=1.1 if e_ponto else 0.5, alpha=0.8 if e_ponto else 0.55)
     # Grupo de pontos (ex.: AMAGGI): mesorregiões do estado em tracejado.
-    grupo = regiao if regiao is not None and regiao.get("tipo") == "grupo" else None
+    grupo = regiao if regiao is not None and regiao.get("tipo") in ("grupo", "ponto") else None
     if grupo and grupo.get("contornos"):
         _desenhar_contornos(ax, grupo["contornos"], extent, tracejado=True, colors="#111111",
                             linewidths=1.15, alpha=0.9, linestyles=[(0, (6, 3))])
     if regiao is not None:
         _desenhar_contornos(ax, [regiao], extent, colors="black", linewidths=1.6)
-    if regiao is not None and regiao.get("tipo") == "regiao":  # sigla de cada estado
+    if regiao is not None and regiao.get("tipo") in ("regiao", "ponto"):  # sigla de cada estado
         import matplotlib.patheffects as pe
         for sigla, lon, lat in regiao.get("rotulos") or []:
-            t = ax.annotate(sigla, (lon, lat), ha="center", va="center", fontsize=12,
-                            fontweight="bold", color="#26323a", zorder=6)
+            t = ax.annotate(sigla, (lon, lat), ha="center", va="center", fontsize=11 if e_ponto else 12,
+                            fontweight="bold", color="#4a5560" if e_ponto else "#26323a", zorder=6)
             t.set_path_effects([pe.withStroke(linewidth=2.6, foreground="white")])
 
     # pontos de cidade (referência p/ localizar) — sempre por cima do resto
@@ -1576,10 +1654,10 @@ def escrever_catalogo(saida, alvos, estados, hoje, dias_dados, rodada, gerado_em
             nome = UF_NOMES.get(uf, regiao["nome"]) if regiao["tipo"] == "estado" else \
                 " ".join(regiao["nome"].split())
             # O painel conhece brasil/estado/mesorregiao: o grupo entra como área da UF.
-            tipo_painel = {"grupo": "mesorregiao", "regiao": "brasil"}.get(regiao["tipo"], regiao["tipo"])
+            tipo_painel = {"grupo": "mesorregiao", "regiao": "brasil", "ponto": "brasil"}.get(regiao["tipo"], regiao["tipo"])
             item = {"id": pasta, "nome": nome, "tipo": tipo_painel,
                     "rotulo": nome_no_mapa(regiao, estados)}
-            if regiao["tipo"] == "regiao":
+            if regiao["tipo"] in ("regiao", "ponto"):
                 item["regiao_brasil"] = True
             if regiao["tipo"] == "grupo":
                 item["grupo"] = True
@@ -1730,6 +1808,11 @@ def main():
                          "em pastas <saida>/<UF>/<mesorregião>/")
     ap.add_argument("--todos-estados", action="store_true", default=True,
                     help="compatibilidade: os estados são sempre gerados em <saida>/<UF>/")
+    ap.add_argument("--ponto", nargs=2, action="append", metavar=("NOME", "COORDENADA"),
+                    help="mapas só em volta de um ponto, separados dos outros (pode repetir). "
+                         "Ex.: --ponto \"Fazenda Boa Vista\" \"-15.601, -56.097\"")
+    ap.add_argument("--raio", type=float, default=RAIO_PONTO_KM,
+                    help=f"km para cada lado do ponto no modo --ponto (padrão: {RAIO_PONTO_KM})")
     ap.add_argument("--regioes-brasil", action="store_true",
                     help="gera também as 5 regiões do Brasil (Norte, Nordeste, Centro-Oeste, "
                          "Sudeste e Sul) em <saida>/regioes/<região>/")
@@ -1785,6 +1868,13 @@ def main():
     pedidos_grupo = [g.strip() for item in (args.grupo or []) for g in re.split(r"[;,\s]+", item) if g.strip()]
     if all(g.casefold() == "nenhum" for g in pedidos_grupo):
         pedidos_grupo = []
+    if args.ponto:  # modo à parte: só os mapas em volta dos pontos
+        if not 20 <= args.raio <= 1000:
+            sys.exit("ERRO: --raio deve ficar entre 20 e 1000 km.")
+        if pedidos or pedidos_grupo or args.todas_meso or args.regioes_brasil:
+            print("  AVISO: com --ponto, só os mapas dos pontos são gerados; as outras áreas ficam de fora.")
+        pedidos, pedidos_grupo = [], []
+        args.sem_brasil, args.sem_estados, args.todas_meso, args.regioes_brasil = True, True, False, False
     caminho_grupos = args.grupos
     if not os.path.isfile(caminho_grupos) and not os.path.isabs(caminho_grupos):
         caminho_grupos = os.path.join(os.path.dirname(__file__), caminho_grupos)
@@ -1807,7 +1897,7 @@ def main():
             print(f"'{'; '.join(em_regioes)}' é grupo de pontos: gerando como grupo, não como região.")
             pedidos = [p for p in pedidos if p.strip().casefold() not in nomes_grupo]
             pedidos_grupo += [p.strip() for p in em_regioes]
-    if not pedidos and args.sem_brasil and not args.todas_meso and args.sem_estados and not pedidos_grupo:
+    if not pedidos and args.sem_brasil and not args.todas_meso and args.sem_estados and not pedidos_grupo and not args.ponto:
         sys.exit("Nada a gerar: sem regiões, grupos, Brasil, estados ou mesorregiões.")
 
     try:
@@ -2009,6 +2099,30 @@ def main():
                 alvos.append((sub_m, reg_m, ext_m, []))
                 print(f"Alvo: grupo {g['nome']} -> {sub_m}  pontos: {', '.join(p['nome'] for p in pontos_m) or 'nenhum'}")
 
+    for nome_ponto, coordenada in args.ponto or []:
+        nome_ponto = " ".join(str(nome_ponto).split())
+        if not nome_ponto:
+            sys.exit("ERRO: informe o nome do ponto.")
+        try:
+            lat, lon, trocou = ler_coordenada(coordenada)
+        except ValueError as e:
+            sys.exit(f"ERRO no ponto {nome_ponto}: {e}")
+        if trocou:
+            print(f"  AVISO: {nome_ponto}: a coordenada parecia estar como longitude, latitude; "
+                  f"usando latitude {lat} e longitude {lon}.")
+        uf = next((uf_sigla(r, fundo_regioes) for r in fundo_regioes if ponto_na_regiao(lon, lat, r)), None)
+        if fundo_regioes and not uf:
+            print(f"  AVISO: {nome_ponto} ({lat}, {lon}) fica fora dos estados do KML; o mapa sai mesmo assim.")
+        ext_p = enquadramento_ponto(lat, lon, args.raio)
+        reg_p = {"nome": nome_ponto, "tipo": "ponto", "uf": uf, "raio_km": args.raio,
+                 "nome_mapa": f"{nome_ponto} — {uf}" if uf else nome_ponto,
+                 "pontos": [{"nome": nome_ponto, "lat": lat, "lon": lon}], "poligonos": [],
+                 "campos": {}, "chaves": [], "arquivo": "", "contornos": [], "rotulos_contornos": [],
+                 "rotulos": siglas_no_quadro(fundo_regioes, ext_p, (lon, lat))}
+        alvos.append((_pasta_segura(nome_ponto), reg_p, ext_p, []))
+        print(f"Alvo: ponto {nome_ponto} ({lat:.5f}, {lon:.5f}) -> {_pasta_segura(nome_ponto)}/  "
+              f"{args.raio:g} km para cada lado{', ' + uf if uf else ''}")
+
     if not alvos:
         sys.exit("Nenhum alvo válido — nada a gerar.")
 
@@ -2024,6 +2138,12 @@ def main():
         return
     cache_dir = None if args.sem_cache else args.cache
     dominio = dominio_dos_alvos(alvos)
+    if args.ponto and fundo_regioes:
+        # Mesmo domínio da execução diária (estados com margem): reaproveita o cache do dia.
+        m = args.margem
+        diario = [(None, None, (b[0] - m, b[2] + m, b[1] - m, b[3] + m), None)
+                  for b in (bbox_enquadramento(r) for r in fundo_regioes)]
+        dominio = dominio_dos_alvos(alvos + diario)
     print(f"Períodos: hoje={hoje.isoformat()}, dias={dias_sel}, fuso=America/Sao_Paulo")
     print("=== Fase 1: download e cálculo dos dias completos em Brasília ===")
     try:
@@ -2068,7 +2188,8 @@ def main():
     for _, r, _, _ in alvos:
         t = "brasil" if r is None else r["tipo"]
         por_tipo[t] = por_tipo.get(t, 0) + 1
-    rotulos_tipo = {"brasil": "Brasil", "regiao": "regiões", "estado": "estados", "mesorregiao": "mesorregiões", "grupo": "grupos"}
+    rotulos_tipo = {"brasil": "Brasil", "regiao": "regiões", "estado": "estados", "mesorregiao": "mesorregiões",
+                    "grupo": "grupos", "ponto": "pontos"}
     partes = ", ".join(f"{rotulos_tipo.get(t, t)} {n}" for t, n in por_tipo.items())
     mapas_dia = len(next(iter(dias_dados.values()))["produtos"]) if dias_dados else 0
     print(f"A gerar {total_esperado} figura(s): {len(alvos)} áreas ({partes}) × {mapas_dia} mapas "

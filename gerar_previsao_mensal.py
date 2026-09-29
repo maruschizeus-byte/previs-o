@@ -227,8 +227,21 @@ def para_celsius(campo, anomalia=False):
 
 
 # ------------------------------------------------------------------ áreas
+def _ler_opcional(caminho, leitor):
+    if not os.path.isfile(caminho) and not os.path.isabs(caminho):
+        caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), caminho)
+    try:
+        return leitor(caminho) if os.path.isfile(caminho) else []
+    except (ValueError, OSError) as e:
+        print(f"  AVISO: não consegui ler {caminho}: {e}")
+        return []
+
+
 def montar_alvos(args, fundo, mesos):
     alvos = []
+    cidades = _ler_opcional(args.cidades, g.ler_cidades)          # uma por mesorregião
+    municipios = _ler_opcional(args.municipios, g.ler_municipios)  # para achar as capitais
+    print(f"Cidades: {len(cidades)} principais, {len(municipios)} municípios")
     caixas = [g.bbox_enquadramento(r) for r in fundo]
     lo0, la0 = min(c[0] for c in caixas), min(c[1] for c in caixas)
     lo1, la1 = max(c[2] for c in caixas), max(c[3] for c in caixas)
@@ -246,10 +259,11 @@ def montar_alvos(args, fundo, mesos):
                "rotulos": [(u, *g.ponto_para_rotulo(por_uf[u])) for u in presentes]}
         alvos.append((os.path.join("regioes", g._pasta_segura(nome_reg)), reg,
                       (min(c[0] for c in cx) - m, max(c[2] for c in cx) + m,
-                       min(c[1] for c in cx) - m, max(c[3] for c in cx) + m), []))
+                       min(c[1] for c in cx) - m, max(c[3] for c in cx) + m), g.capitais_da_regiao(presentes, municipios)))
     for r in sorted(fundo, key=lambda r: g.UF_NOMES.get(g.uf_sigla(r, fundo), r["nome"])):
         b = g.bbox_enquadramento(r)
-        alvos.append((g.subdir_do_alvo(r, fundo), r, (b[0] - m, b[2] + m, b[1] - m, b[3] + m), []))
+        alvos.append((g.subdir_do_alvo(r, fundo), r, (b[0] - m, b[2] + m, b[1] - m, b[3] + m),
+                      g.cidades_do_estado(r, cidades, municipios, fundo)))
     if args.grupos:  # grupos de pontos (ex.: AMAGGI), só o mapa do estado
         for gr in g.ler_grupos(args.grupos).values():
             estado = por_uf.get(gr["uf"])
@@ -295,14 +309,14 @@ def _iniciar(estado):
 def _figura(tarefa):
     i_alvo, chave = tarefa
     e = _TRABALHO
-    subdir, regiao, extent, _ = e["alvos"][i_alvo]
+    subdir, regiao, extent, cids = e["alvos"][i_alvo]
     produto, periodo, rotulo, dados, trimestre = e["campos"][chave]
     titulo, f_mes, f_tri, acima, abaixo, extend = PRODUTOS[produto]
     arquivo = nome_arquivo(regiao, e["fundo"], produto, periodo)
     g.plotar(e["lons"], e["lats"], dados, titulo, f"{rotulo} · tendência",
              os.path.join(e["saida"], subdir, arquivo), f_tri if trimestre else f_mes,
              cor_acima=acima, cor_abaixo=abaixo, extend=extend, extent=extent, regiao=regiao,
-             fundo=e["fundo"], cidades=[], logo=e["logo"])
+             fundo=e["fundo"], cidades=cids, logo=e["logo"])
     return os.path.join(e["saida"], subdir), arquivo
 
 
@@ -315,6 +329,8 @@ def main():
     ap.add_argument("--cache", default=".cache_c3s", help="pasta dos arquivos baixados do Copernicus")
     ap.add_argument("--logo", default=None, help="logo principal (ex.: logo.png)")
     ap.add_argument("--grupos", default=None, help="grupos.json para incluir grupos (ex.: AMAGGI)")
+    ap.add_argument("--cidades", default=g.CIDADES_PADRAO, help="CSV das cidades principais (mapas de estado)")
+    ap.add_argument("--municipios", default=g.MUNICIPIOS_PADRAO, help="CSV das sedes dos municípios (capitais)")
     ap.add_argument("--mes-inicio", default=None, help="primeiro dos 3 meses (AAAA-MM). Padrão: mês atual")
     ap.add_argument("--sistema", default=SISTEMA_PADRAO, help=f"sistema do ECMWF no Copernicus (padrão {SISTEMA_PADRAO})")
     ap.add_argument("--sem-anomalia", action="store_true", help="só a previsão, sem os mapas de anomalia")

@@ -59,6 +59,9 @@ UTC = dt.timezone.utc
 DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
 STEPS_ECMWF = tuple(range(0, 145, 3)) + tuple(range(150, 361, 6))
 CIDADES_PADRAO = "Cidades_principais_137_mesorregioes_Brasil.csv"
+# Sedes dos 5.570 municípios (IBGE), para as cidades de referência no mapa de um ponto.
+# Base: github.com/kelvins/Municipios-Brasileiros (licença MIT).
+MUNICIPIOS_PADRAO = "municipios_brasil.csv"
 
 # Domínio de reserva. O domínio efetivo cobre todos os enquadramentos + borda.
 # Os campos globais são baixados uma vez por parâmetro/passo e recortados ao ler.
@@ -777,6 +780,75 @@ def siglas_no_quadro(estados, extent, centro):
     return rotulos
 
 
+def ler_municipios(caminho):
+    """CSV codigo_ibge,nome,uf,lat,lon,capital -> lista de dicionários."""
+    import csv
+    saida = []
+    with open(caminho, encoding="utf-8-sig", newline="") as f:
+        for r in csv.DictReader(f):
+            try:
+                saida.append({"nome": r["nome"].strip(), "uf": r.get("uf", "").strip(), "lat": float(r["lat"]),
+                              "lon": float(r["lon"]), "capital": str(r.get("capital", "0")).strip() == "1"})
+            except (KeyError, ValueError):
+                continue
+    if not saida:
+        raise ValueError(f"nenhum município lido de {caminho}")
+    return saida
+
+
+def _km(lat1, lon1, lat2, lon2):
+    f1, f2 = math.radians(lat1), math.radians(lat2)
+    a = math.sin((f2 - f1) / 2) ** 2 + math.cos(f1) * math.cos(f2) * math.sin(math.radians(lon2 - lon1) / 2) ** 2
+    return 12742 * math.asin(min(1.0, math.sqrt(a)))
+
+
+def cidades_do_estado(estado, cidades, municipios, estados, maximo=16):
+    """Capital e cidades principais (uma por mesorregião, do CSV) dentro do estado."""
+    uf = uf_sigla(estado, estados)
+    capitais = [m for m in municipios if m["capital"] and m["uf"] == uf]
+    principais = [c for c in cidades if (uf and c.get("uf") == uf) or ponto_na_regiao(c["lon"], c["lat"], estado)]
+    escolhidas = []
+    for c in capitais + principais:  # a capital primeiro: é a que nunca fica de fora
+        if all(_km(c["lat"], c["lon"], e["lat"], e["lon"]) > 15 for e in escolhidas):
+            escolhidas.append({"nome": c["nome"], "lat": c["lat"], "lon": c["lon"], "capital": bool(c.get("capital"))})
+    return escolhidas[:maximo]
+
+
+def capitais_da_regiao(ufs, municipios):
+    return [{"nome": m["nome"], "lat": m["lat"], "lon": m["lon"], "capital": True}
+            for m in municipios if m["capital"] and m["uf"] in ufs]
+
+
+def cidades_perto_do_ponto(lat, lon, extent, municipios, principais=(), minimo=2):
+    """Cidades de referência para o mapa de um ponto: até 2 referências grandes do
+    quadro (capital ou cidade principal) e as sedes mais próximas do ponto, bem
+    espaçadas, somando 3 ou 4. Fora das bordas, para o nome não sair cortado."""
+    x0, x1, y0, y1 = extent
+    mx, my = 0.07 * (x1 - x0), 0.06 * (y1 - y0)
+    dentro = [dict(m, dist=_km(lat, lon, m["lat"], m["lon"])) for m in municipios
+              if x0 + mx <= m["lon"] <= x1 - mx and y0 + my <= m["lat"] <= y1 - my]
+    grandes = {_sem_acento(c["nome"]): c for c in principais}
+    for m in dentro:
+        c = grandes.get(_sem_acento(m["nome"]))
+        m["peso"] = 2 if m["capital"] else 1 if c and _km(c["lat"], c["lon"], m["lat"], m["lon"]) < 30 else 0
+    escolhidas = []
+    livre = lambda m, espaco, perto: (m not in escolhidas and m["dist"] >= perto and
+                                      all(_km(m["lat"], m["lon"], e["lat"], e["lon"]) >= espaco for e in escolhidas))
+    for m in sorted((m for m in dentro if m["peso"]), key=lambda m: (-m["peso"], m["dist"])):
+        if len(escolhidas) < 2 and livre(m, 40, 3):  # capital ou cidade principal: vale mesmo bem perto
+            escolhidas.append(m)
+    alvo = 4 if escolhidas else 3
+    for espaco, perto in ((40, 8), (25, 8), (12, 3), (0, 0)):  # afrouxa até ter o mínimo
+        for m in sorted(dentro, key=lambda m: m["dist"]):
+            if len(escolhidas) >= alvo:
+                break
+            if livre(m, espaco, perto):
+                escolhidas.append(m)
+        if len(escolhidas) >= minimo:
+            break
+    return [{"nome": m["nome"], "lat": m["lat"], "lon": m["lon"]} for m in escolhidas]
+
+
 def remover_grupos_orfaos(saida, grupos, gerados=()):
     """Apaga pastas de grupo que não estão mais no grupos.json e, nos grupos
     gerados agora, os mapas por mesorregião que deixaram de ser gerados."""
@@ -1323,6 +1395,100 @@ def _add_logo(fig, ax, caminho, pos, escala, alpha, fundo=True):
     return ab
 
 
+CANTOS_LOGO = ("inferior-direita", "inferior-esquerda", "superior-direita", "superior-esquerda")
+
+
+def _colocar_logos(fig, ax, renderer, pedidos, locais, escala, alpha, fundo):
+    """Cada logo no canto pedido; se ele cobrir algum local, tenta os outros cantos e
+    fica no primeiro livre (ou no que cobre menos). Duas logos nunca dividem o canto."""
+    artistas, usados = [], set()
+    for caminho, preferido in pedidos:
+        melhor = None
+        for canto in [preferido] + [c for c in CANTOS_LOGO if c != preferido]:
+            if canto in usados:
+                continue
+            ab = _add_logo(fig, ax, caminho, canto, escala, alpha, fundo=fundo)
+            if ab is None:
+                break
+            bb = ab.get_window_extent(renderer).padded(4)
+            cobre = sum(1 for l in locais if bb.overlaps(l))
+            if melhor is None or cobre < melhor[1]:
+                if melhor:
+                    melhor[0].remove()
+                melhor = (ab, cobre, canto)
+            else:
+                ab.remove()
+            if cobre == 0:
+                break
+        if melhor:
+            artistas.append(melhor[0]); usados.add(melhor[2])
+    return artistas
+
+
+def _rotular_cidades(ax, renderer, cidades, obstaculos=(), pular=False, siglas=None):
+    """Nome de cada cidade à direita (ou à esquerda, acima, abaixo) sem bater em outro
+    nome, no ponto de outra cidade, nos obstáculos (ex.: triângulos dos pontos) nem sair
+    do mapa. Devolve as caixas do ponto e do nome de cada cidade."""
+    import matplotlib.patheffects as pe
+    from matplotlib.transforms import Bbox
+    halo = [pe.withStroke(linewidth=2.4, foreground="white")]
+    eixo, caixas = ax.get_window_extent(renderer), []
+    marcas = []
+    for c in cidades:
+        x, y = ax.transData.transform((c["lon"], c["lat"]))
+        marcas.append(Bbox.from_extents(x - 6, y - 6, x + 6, y + 6))
+    siglas = siglas if siglas is not None else []
+    caixa_sigla = lambda t: t.get_window_extent(renderer).padded(2)
+    for i, c in enumerate(cidades):
+        x, y = ax.transData.transform((c["lon"], c["lat"]))
+        marca = marcas[i]
+        obrig = pular and c.get("capital")  # capital: sempre entra e passa na frente das siglas
+        if pular:  # só o que já entrou bloqueia; o ponto da cidade também precisa estar livre
+            bloqueios = caixas + list(obstaculos) + ([] if obrig else [caixa_sigla(t) for t in siglas])
+            if not obrig and any(marca.overlaps(o) for o in bloqueios):
+                continue
+        else:
+            bloqueios = caixas + [m for k, m in enumerate(marcas) if k != i] + list(obstaculos)
+        opcoes = [((5, 4), "left", "baseline"), ((-5, 4), "right", "baseline"),
+                  ((0, 7), "center", "bottom"), ((0, -8), "center", "top")]
+        if x > eixo.x0 + 0.7 * eixo.width:  # perto da borda direita: começa pela esquerda (como antes)
+            opcoes[0], opcoes[1] = opcoes[1], opcoes[0]
+        escolhido = reserva = None
+        nota_reserva = None
+        for off, ha, va in opcoes:
+            t = ax.annotate(c["nome"], (c["lon"], c["lat"]), xytext=off, textcoords="offset points",
+                            ha=ha, va=va, fontsize=11.5, fontweight="bold", color="black", zorder=7)
+            t.set_path_effects(halo)
+            bb = t.get_window_extent(renderer).padded(2)
+            dentro = bb.x0 >= eixo.x0 and bb.x1 <= eixo.x1 and bb.y0 >= eixo.y0 and bb.y1 <= eixo.y1
+            colisoes = sum(1 for o in bloqueios if bb.overlaps(o))
+            if dentro and not colisoes:
+                escolhido = (t, bb)
+                break
+            nota = (not dentro, colisoes)  # capital sem lugar livre: a que menos atrapalha
+            if reserva is None or (obrig and nota < nota_reserva):
+                if reserva:
+                    reserva[0].remove()
+                reserva, nota_reserva = (t, bb), nota
+            else:
+                t.remove()
+        if escolhido and reserva:
+            reserva[0].remove()
+        if pular and not escolhido:  # sem lugar livre: a cidade fica de fora
+            if reserva:
+                reserva[0].remove()
+            continue
+        escolhido = escolhido or reserva
+        if pular:
+            ax.plot(c["lon"], c["lat"], marker="o", markersize=5.5, markerfacecolor="black",
+                    markeredgecolor="white", markeredgewidth=0.9, zorder=6)
+        if obrig:  # a sigla que ficaria por baixo da capital sai (o nome da capital já diz o estado)
+            for t in [t for t in siglas if caixa_sigla(t).overlaps(escolhido[1]) or caixa_sigla(t).overlaps(marca)]:
+                t.remove(); siglas.remove(t)
+        caixas += [marca, escolhido[1]]
+    return caixas
+
+
 def _cubica_eixo(v, fator, eixo):
     """Catmull-Rom ao longo de um eixo: passa exatamente pelos pontos da grade."""
     n = v.shape[eixo]
@@ -1501,27 +1667,22 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
                             linewidths=1.15, alpha=0.9, linestyles=[(0, (6, 3))])
     if regiao is not None:
         _desenhar_contornos(ax, [regiao], extent, colors="black", linewidths=1.6)
+    siglas_txt = []
     if regiao is not None and regiao.get("tipo") in ("regiao", "ponto"):  # sigla de cada estado
         import matplotlib.patheffects as pe
         for sigla, lon, lat in regiao.get("rotulos") or []:
             t = ax.annotate(sigla, (lon, lat), ha="center", va="center", fontsize=11 if e_ponto else 12,
                             fontweight="bold", color="#4a5560" if e_ponto else "#26323a", zorder=6)
             t.set_path_effects([pe.withStroke(linewidth=2.6, foreground="white")])
+            siglas_txt.append(t)
 
     # pontos de cidade (referência p/ localizar) — sempre por cima do resto
-    if cidades:
-        import matplotlib.patheffects as pe
-        halo = [pe.withStroke(linewidth=2.4, foreground="white")]
-        for cidade in cidades:
-            nome, lat, lon = cidade["nome"], cidade["lat"], cidade["lon"]
-            ax.plot(lon, lat, marker="o", markersize=5.5, markerfacecolor="black",
-                    markeredgecolor="white", markeredgewidth=0.9, zorder=6)
-            perto_direita = extent is not None and lon > extent[0] + 0.7 * (extent[1] - extent[0])
-            t = ax.annotate(nome, (lon, lat), xytext=(-5 if perto_direita else 5, 4),
-                            ha="right" if perto_direita else "left",
-                            textcoords="offset points", fontsize=11.5,
-                            fontweight="bold", color="black", zorder=7)
-            t.set_path_effects(halo)
+    # Estado e região têm muitas cidades: a que não couber fica de fora (ponto e nome
+    # entram juntos, depois do desenho). Mesorregião e ponto: como antes.
+    enxuto = regiao is not None and regiao.get("tipo") in ("estado", "regiao")
+    for cidade in [] if enxuto else cidades or []:  # o nome entra depois do desenho, desviando dos outros
+        ax.plot(cidade["lon"], cidade["lat"], marker="o", markersize=5.5, markerfacecolor="black",
+                markeredgecolor="white", markeredgewidth=0.9, zorder=6)
 
     if extent is not None:
         ax.set_xlim(extent[0], extent[1]); ax.set_ylim(extent[2], extent[3])
@@ -1550,18 +1711,30 @@ def plotar(lons, lats, dados, titulo, periodo_txt, png_path, faixas,
     renderer = fig.canvas.get_renderer()
     # Logos depois do desenho (a posição final do mapa já está definida) e
     # antes dos rótulos do grupo, para os rótulos desviarem delas.
-    logos = []
+    # Nomes das cidades com as posições finais do mapa; depois as logos, num canto
+    # que não cubra os locais (ponto, pontos do grupo, cidades e seus nomes).
+    from matplotlib.transforms import Bbox
+    marcas_grupo = []
+    for p in (grupo or {}).get("pontos") or []:  # triângulos do ponto ou dos pontos do grupo
+        x, y = ax.transData.transform((p["lon"], p["lat"]))
+        marcas_grupo.append(Bbox.from_extents(x - 10, y - 9, x + 10, y + 11))
+    caixas_cidades = _rotular_cidades(ax, renderer, cidades or [], marcas_grupo, pular=enxuto,
+                                      siglas=siglas_txt if enxuto else None)
+    locais = caixas_cidades + marcas_grupo
+    pedidos = []
     if logo:
-        logos.append(_add_logo(fig, ax, logo, logo_pos, logo_escala, logo_alpha, fundo=logo_fundo))
+        pedidos.append((logo, logo_pos))
     logo_grupo = (regiao or {}).get("logo_grupo")
     if logo_grupo:
         pos_grupo = logo_grupo[1]
         if logo and pos_grupo == logo_pos:  # mesmo canto da logo principal: vai para o lado oposto
             pos_grupo = pos_grupo.replace("direita", "X").replace("esquerda", "direita").replace("X", "esquerda")
-        logos.append(_add_logo(fig, ax, logo_grupo[0], pos_grupo, logo_escala, logo_alpha, fundo=logo_fundo))
+        pedidos.append((logo_grupo[0], pos_grupo))
+    logos = _colocar_logos(fig, ax, renderer, pedidos, locais, logo_escala, logo_alpha, logo_fundo)
     if grupo:
         fig.canvas.draw()
-        _rotular_grupo(ax, renderer, grupo, [a.get_window_extent(renderer).padded(4) for a in logos if a])
+        _rotular_grupo(ax, renderer, grupo, [a.get_window_extent(renderer).padded(4) for a in logos if a]
+                       + caixas_cidades)
     largura_px = ax.get_window_extent(renderer).width
     nome_alvo = nome_no_mapa(regiao, fundo)
     cabecalho = _quebrar_texto_mapa(nome_alvo, largura_px, renderer, 14, "bold")
@@ -1811,6 +1984,9 @@ def main():
     ap.add_argument("--ponto", nargs=2, action="append", metavar=("NOME", "COORDENADA"),
                     help="mapas só em volta de um ponto, separados dos outros (pode repetir). "
                          "Ex.: --ponto \"Fazenda Boa Vista\" \"-15.601, -56.097\"")
+    ap.add_argument("--municipios", default=MUNICIPIOS_PADRAO,
+                    help=f"CSV das sedes dos municípios, para as cidades de referência do mapa de um ponto "
+                         f"(padrão: {MUNICIPIOS_PADRAO})")
     ap.add_argument("--raio", type=float, default=RAIO_PONTO_KM,
                     help=f"km para cada lado do ponto no modo --ponto (padrão: {RAIO_PONTO_KM})")
     ap.add_argument("--regioes-brasil", action="store_true",
@@ -1955,6 +2131,19 @@ def main():
         except ValueError as e:
             print(f"  AVISO: {e}")
 
+    municipios = []
+    # Sedes dos municípios: capitais nos mapas de estado e região; cidades do mapa de um ponto.
+    caminho_mun = args.municipios
+    if not os.path.isfile(caminho_mun) and not os.path.isabs(caminho_mun):
+        caminho_mun = os.path.join(os.path.dirname(os.path.abspath(__file__)), caminho_mun)
+    if os.path.isfile(caminho_mun):
+        try:
+            municipios = ler_municipios(caminho_mun)
+            print(f"Municípios: {len(municipios)} de {caminho_mun}")
+        except (ValueError, OSError) as e:
+            print(f"  AVISO: não consegui ler os municípios ({e}); uso só as cidades principais.")
+    elif args.ponto:
+        print(f"  AVISO: {args.municipios} não encontrado; uso só as cidades principais, que podem não aparecer.")
     # logo (opcional): resolve uma vez; se faltar, segue sem
     logo = None
     if args.logo:
@@ -1986,7 +2175,10 @@ def main():
         ext = (lo0 - m, lo1 + m, la0 - m, la1 + m)
         cids = list(cidades_cli)
         try:
-            cids += cidades_da_mesorregiao(r, cidades_arquivo, fundo_regioes)
+            if r.get("tipo") == "estado":
+                cids += cidades_do_estado(r, cidades_arquivo, municipios, fundo_regioes)
+            else:
+                cids += cidades_da_mesorregiao(r, cidades_arquivo, fundo_regioes)
         except ValueError as e:
             sys.exit(f"ERRO nas cidades: {e}")
         sub = subdir_do_alvo(r, fundo_regioes)
@@ -2025,7 +2217,7 @@ def main():
                    "poligonos": [p for e in estados_reg for p in e["poligonos"]],
                    "rotulos": [(u, *ponto_para_rotulo(por_uf[u])) for u in presentes]}
             sub_reg = os.path.join("regioes", _pasta_segura(nome_reg))
-            alvos.append((sub_reg, reg, ext_reg, []))
+            alvos.append((sub_reg, reg, ext_reg, capitais_da_regiao(presentes, municipios)))
             print(f"Alvo: Região {nome_reg} -> {sub_reg}  ({', '.join(presentes)})")
 
     for pedido in pedidos:
@@ -2127,6 +2319,7 @@ def main():
                 alvos.append((sub_m, reg_m, ext_m, []))
                 print(f"Alvo: grupo {g['nome']} -> {sub_m}  pontos: {', '.join(p['nome'] for p in pontos_m) or 'nenhum'}")
 
+    base_cidades = municipios or [dict(c, capital=False) for c in cidades_arquivo]
     for nome_ponto, coordenada in args.ponto or []:
         nome_ponto = " ".join(str(nome_ponto).split())
         if not nome_ponto:
@@ -2147,9 +2340,13 @@ def main():
                  "pontos": [{"nome": nome_ponto, "lat": lat, "lon": lon}], "poligonos": [],
                  "campos": {}, "chaves": [], "arquivo": "", "contornos": [], "rotulos_contornos": [],
                  "rotulos": siglas_no_quadro(fundo_regioes, ext_p, (lon, lat))}
-        alvos.append((_pasta_segura(nome_ponto), reg_p, ext_p, []))
+        cids = cidades_perto_do_ponto(lat, lon, ext_p, base_cidades, cidades_arquivo)
+        alvos.append((_pasta_segura(nome_ponto), reg_p, ext_p, cids))
         print(f"Alvo: ponto {nome_ponto} ({lat:.5f}, {lon:.5f}) -> {_pasta_segura(nome_ponto)}/  "
-              f"{args.raio:g} km para cada lado{', ' + uf if uf else ''}")
+              f"{args.raio:g} km para cada lado{', ' + uf if uf else ''} | cidades: "
+              + (", ".join(c["nome"] for c in cids) or "nenhuma"))
+        if len(cids) < 2:
+            print(f"  AVISO: {nome_ponto}: menos de 2 cidades no quadro (ponto isolado ou sem o {MUNICIPIOS_PADRAO}).")
 
     if not alvos:
         sys.exit("Nenhum alvo válido — nada a gerar.")

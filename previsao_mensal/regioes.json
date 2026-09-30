@@ -1,0 +1,273 @@
+{
+  "total": 33,
+  "regioes": [
+    {
+      "nome": "Brasil",
+      "tipo": "brasil",
+      "uf": null,
+      "arquivo_kml": null,
+      "pasta": "brasil"
+    },
+    {
+      "nome": "Norte",
+      "tipo": "regiao",
+      "uf": null,
+      "arquivo_kml": "estados.kml",
+      "pasta": "regioes/Norte",
+      "ufs": [
+        "AC",
+        "AP",
+        "AM",
+        "PA",
+        "RO",
+        "RR",
+        "TO"
+      ]
+    },
+    {
+      "nome": "Nordeste",
+      "tipo": "regiao",
+      "uf": null,
+      "arquivo_kml": "estados.kml",
+      "pasta": "regioes/Nordeste",
+      "ufs": [
+        "AL",
+        "BA",
+        "CE",
+        "MA",
+        "PB",
+        "PE",
+        "PI",
+        "RN",
+        "SE"
+      ]
+    },
+    {
+      "nome": "Centro-Oeste",
+      "tipo": "regiao",
+      "uf": null,
+      "arquivo_kml": "estados.kml",
+      "pasta": "regioes/Centro-Oeste",
+      "ufs": [
+        "DF",
+        "GO",
+        "MT",
+        "MS"
+      ]
+    },
+    {
+      "nome": "Sudeste",
+      "tipo": "regiao",
+      "uf": null,
+      "arquivo_kml": "estados.kml",
+      "pasta": "regioes/Sudeste",
+      "ufs": [
+        "ES",
+        "MG",
+        "RJ",
+        "SP"
+      ]
+    },
+    {
+      "nome": "Sul",
+      "tipo": "regiao",
+      "uf": null,
+      "arquivo_kml": "estados.kml",
+      "pasta": "regioes/Sul",
+      "ufs": [
+        "PR",
+        "RS",
+        "SC"
+      ]
+    },
+    {
+      "nome": "Acre",
+      "tipo": "estado",
+      "uf": "AC",
+      "arquivo_kml": "estados.kml",
+      "pasta": "AC"
+    },
+    {
+      "nome": "Alagoas",
+      "tipo": "estado",
+      "uf": "AL",
+      "arquivo_kml": "estados.kml",
+      "pasta": "AL"
+    },
+    {
+      "nome": "Amapá",
+      "tipo": "estado",
+      "uf": "AP",
+      "arquivo_kml": "estados.kml",
+      "pasta": "AP"
+    },
+    {
+      "nome": "Amazonas",
+      "tipo": "estado",
+      "uf": "AM",
+      "arquivo_kml": "estados.kml",
+      "pasta": "AM"
+    },
+    {
+      "nome": "Bahia",
+      "tipo": "estado",
+      "uf": "BA",
+      "arquivo_kml": "estados.kml",
+      "pasta": "BA"
+    },
+    {
+      "nome": "Ceará",
+      "tipo": "estado",
+      "uf": "CE",
+      "arquivo_kml": "estados.kml",
+      "pasta": "CE"
+    },
+    {
+      "nome": "Distrito Federal",
+      "tipo": "estado",
+      "uf": "DF",
+      "arquivo_kml": "estados.kml",
+      "pasta": "DF"
+    },
+    {
+      "nome": "Espírito Santo",
+      "tipo": "estado",
+      "uf": "ES",
+      "arquivo_kml": "estados.kml",
+      "pasta": "ES"
+    },
+    {
+      "nome": "Goiás",
+      "tipo": "estado",
+      "uf": "GO",
+      "arquivo_kml": "estados.kml",
+      "pasta": "GO"
+    },
+    {
+      "nome": "Maranhão",
+      "tipo": "estado",
+      "uf": "MA",
+      "arquivo_kml": "estados.kml",
+      "pasta": "MA"
+    },
+    {
+      "nome": "Mato Grosso",
+      "tipo": "estado",
+      "uf": "MT",
+      "arquivo_kml": "estados.kml",
+      "pasta": "MT"
+    },
+    {
+      "nome": "Mato Grosso do Sul",
+      "tipo": "estado",
+      "uf": "MS",
+      "arquivo_kml": "estados.kml",
+      "pasta": "MS"
+    },
+    {
+      "nome": "Minas Gerais",
+      "tipo": "estado",
+      "uf": "MG",
+      "arquivo_kml": "estados.kml",
+      "pasta": "MG"
+    },
+    {
+      "nome": "Paraná",
+      "tipo": "estado",
+      "uf": "PR",
+      "arquivo_kml": "estados.kml",
+      "pasta": "PR"
+    },
+    {
+      "nome": "Paraíba",
+      "tipo": "estado",
+      "uf": "PB",
+      "arquivo_kml": "estados.kml",
+      "pasta": "PB"
+    },
+    {
+      "nome": "Pará",
+      "tipo": "estado",
+      "uf": "PA",
+      "arquivo_kml": "estados.kml",
+      "pasta": "PA"
+    },
+    {
+      "nome": "Pernambuco",
+      "tipo": "estado",
+      "uf": "PE",
+      "arquivo_kml": "estados.kml",
+      "pasta": "PE"
+    },
+    {
+      "nome": "Piauí",
+      "tipo": "estado",
+      "uf": "PI",
+      "arquivo_kml": "estados.kml",
+      "pasta": "PI"
+    },
+    {
+      "nome": "Rio Grande do Norte",
+      "tipo": "estado",
+      "uf": "RN",
+      "arquivo_kml": "estados.kml",
+      "pasta": "RN"
+    },
+    {
+      "nome": "Rio Grande do Sul",
+      "tipo": "estado",
+      "uf": "RS",
+      "arquivo_kml": "estados.kml",
+      "pasta": "RS"
+    },
+    {
+      "nome": "Rio de Janeiro",
+      "tipo": "estado",
+      "uf": "RJ",
+      "arquivo_kml": "estados.kml",
+      "pasta": "RJ"
+    },
+    {
+      "nome": "Rondônia",
+      "tipo": "estado",
+      "uf": "RO",
+      "arquivo_kml": "estados.kml",
+      "pasta": "RO"
+    },
+    {
+      "nome": "Roraima",
+      "tipo": "estado",
+      "uf": "RR",
+      "arquivo_kml": "estados.kml",
+      "pasta": "RR"
+    },
+    {
+      "nome": "Santa Catarina",
+      "tipo": "estado",
+      "uf": "SC",
+      "arquivo_kml": "estados.kml",
+      "pasta": "SC"
+    },
+    {
+      "nome": "Sergipe",
+      "tipo": "estado",
+      "uf": "SE",
+      "arquivo_kml": "estados.kml",
+      "pasta": "SE"
+    },
+    {
+      "nome": "São Paulo",
+      "tipo": "estado",
+      "uf": "SP",
+      "arquivo_kml": "estados.kml",
+      "pasta": "SP"
+    },
+    {
+      "nome": "Tocantins",
+      "tipo": "estado",
+      "uf": "TO",
+      "arquivo_kml": "estados.kml",
+      "pasta": "TO"
+    }
+  ]
+}

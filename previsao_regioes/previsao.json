@@ -1,0 +1,164 @@
+{
+  "fuso": "America/Sao_Paulo",
+  "data_base_brasilia": "2026-10-10",
+  "rodada_utc": "2026-10-10T00:00:00+00:00",
+  "rodada_brasilia": "2026-10-09T21:00:00-03:00",
+  "gerado_em_brasilia": "2026-10-10T12:28:21-03:00",
+  "total_mapas": 5440,
+  "periodos": [
+    {
+      "data": "2026-10-10",
+      "dia_semana": "sáb",
+      "inicio_brasilia": "2026-10-10T00:00:00-03:00",
+      "fim_brasilia_exclusivo": "2026-10-11T00:00:00-03:00",
+      "inicio_utc": "2026-10-10T03:00:00+00:00",
+      "fim_utc_exclusivo": "2026-10-11T03:00:00+00:00",
+      "inicio_acumulado_brasilia": "2026-10-10T00:00:00-03:00",
+      "chuva_limites_interpolados": false,
+      "temperatura": "mínima/máxima estimadas entre amostras dentro do dia",
+      "nuvem": "média diária ponderada pelo tempo, integração trapezoidal",
+      "horizonte_dias": 0,
+      "produtos": [
+        "chuva_dia",
+        "chuva_acumulado",
+        "tmin",
+        "tmax"
+      ]
+    },
+    {
+      "data": "2026-10-11",
+      "dia_semana": "dom",
+      "inicio_brasilia": "2026-10-11T00:00:00-03:00",
+      "fim_brasilia_exclusivo": "2026-10-12T00:00:00-03:00",
+      "inicio_utc": "2026-10-11T03:00:00+00:00",
+      "fim_utc_exclusivo": "2026-10-12T03:00:00+00:00",
+      "inicio_acumulado_brasilia": "2026-10-10T00:00:00-03:00",
+      "chuva_limites_interpolados": false,
+      "temperatura": "mínima/máxima estimadas entre amostras dentro do dia",
+      "nuvem": "média diária ponderada pelo tempo, integração trapezoidal",
+      "horizonte_dias": 1,
+      "produtos": [
+        "chuva_dia",
+        "chuva_acumulado",
+        "tmin",
+        "tmax"
+      ]
+    },
+    {
+      "data": "2026-10-12",
+      "dia_semana": "seg",
+      "inicio_brasilia": "2026-10-12T00:00:00-03:00",
+      "fim_brasilia_exclusivo": "2026-10-13T00:00:00-03:00",
+      "inicio_utc": "2026-10-12T03:00:00+00:00",
+      "fim_utc_exclusivo": "2026-10-13T03:00:00+00:00",
+      "inicio_acumulado_brasilia": "2026-10-10T00:00:00-03:00",
+      "chuva_limites_interpolados": false,
+      "temperatura": "mínima/máxima estimadas entre amostras dentro do dia",
+      "nuvem": "média diária ponderada pelo tempo, integração trapezoidal",
+      "horizonte_dias": 2,
+      "produtos": [
+        "chuva_dia",
+        "chuva_acumulado",
+        "tmin",
+        "tmax"
+      ]
+    },
+    {
+      "data": "2026-10-13",
+      "dia_semana": "ter",
+      "inicio_brasilia": "2026-10-13T00:00:00-03:00",
+      "fim_brasilia_exclusivo": "2026-10-14T00:00:00-03:00",
+      "inicio_utc": "2026-10-13T03:00:00+00:00",
+      "fim_utc_exclusivo": "2026-10-14T03:00:00+00:00",
+      "inicio_acumulado_brasilia": "2026-10-10T00:00:00-03:00",
+      "chuva_limites_interpolados": false,
+      "temperatura": "mínima/máxima estimadas entre amostras dentro do dia",
+      "nuvem": "média diária ponderada pelo tempo, integração trapezoidal",
+      "horizonte_dias": 3,
+      "produtos": [
+        "chuva_dia",
+        "chuva_acumulado",
+        "tmin",
+        "tmax"
+      ]
+    },
+    {
+      "data": "2026-10-14",
+      "dia_semana": "qua",
+      "inicio_brasilia": "2026-10-14T00:00:00-03:00",
+      "fim_brasilia_exclusivo": "2026-10-15T00:00:00-03:00",
+      "inicio_utc": "2026-10-14T03:00:00+00:00",
+      "fim_utc_exclusivo": "2026-10-15T03:00:00+00:00",
+      "inicio_acumulado_brasilia": "2026-10-10T00:00:00-03:00",
+      "chuva_limites_interpolados": false,
+      "temperatura": "mínima/máxima estimadas entre amostras dentro do dia",
+      "nuvem": "média diária ponderada pelo tempo, integração trapezoidal",
+      "horizonte_dias": 4,
+      "produtos": [
+        "chuva_dia",
+        "chuva_acumulado",
+        "tmin",
+        "tmax"
+      ]
+    },
+    {
+      "data": "2026-10-15",
+      "dia_semana": "qui",
+      "inicio_brasilia": "2026-10-15T00:00:00-03:00",
+      "fim_brasilia_exclusivo": "2026-10-16T00:00:00-03:00",
+      "inicio_utc": "2026-10-15T03:00:00+00:00",
+      "fim_utc_exclusivo": "2026-10-16T03:00:00+00:00",
+      "inicio_acumulado_brasilia": "2026-10-10T00:00:00-03:00",
+      "chuva_limites_interpolados": true,
+      "temperatura": "mínima/máxima estimadas entre amostras dentro do dia",
+      "nuvem": "média diária ponderada pelo tempo, integração trapezoidal",
+      "horizonte_dias": 5,
+      "produtos": [
+        "chuva_dia",
+        "chuva_acumulado",
+        "tmin",
+        "tmax"
+      ]
+    },
+    {
+      "data": "2026-10-16",
+      "dia_semana": "sex",
+      "inicio_brasilia": "2026-10-16T00:00:00-03:00",
+      "fim_brasilia_exclusivo": "2026-10-17T00:00:00-03:00",
+      "inicio_utc": "2026-10-16T03:00:00+00:00",
+      "fim_utc_exclusivo": "2026-10-17T03:00:00+00:00",
+      "inicio_acumulado_brasilia": "2026-10-10T00:00:00-03:00",
+      "chuva_limites_interpolados": true,
+      "temperatura": "mínima/máxima estimadas entre amostras dentro do dia",
+      "nuvem": "média diária ponderada pelo tempo, integração trapezoidal",
+      "horizonte_dias": 6,
+      "produtos": [
+        "chuva_dia",
+        "chuva_acumulado",
+        "tmin",
+        "tmax"
+      ]
+    },
+    {
+      "data": "2026-10-17",
+      "dia_semana": "sáb",
+      "inicio_brasilia": "2026-10-17T00:00:00-03:00",
+      "fim_brasilia_exclusivo": "2026-10-18T00:00:00-03:00",
+      "inicio_utc": "2026-10-17T03:00:00+00:00",
+      "fim_utc_exclusivo": "2026-10-18T03:00:00+00:00",
+      "inicio_acumulado_brasilia": "2026-10-10T00:00:00-03:00",
+      "chuva_limites_interpolados": true,
+      "temperatura": "mínima/máxima estimadas entre amostras dentro do dia",
+      "nuvem": "média diária ponderada pelo tempo, integração trapezoidal",
+      "horizonte_dias": 7,
+      "produtos": [
+        "chuva_dia",
+        "chuva_acumulado",
+        "tmin",
+        "tmax"
+      ]
+    }
+  ],
+  "identificacao_mapas": "Região/UF, variável/unidade, data e fonte ECMWF",
+  "nota": "São previsões do modelo, inclusive para as horas de hoje já transcorridas."
+}

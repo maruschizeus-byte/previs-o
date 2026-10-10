@@ -1,0 +1,12 @@
+{
+  "nome": "Sul",
+  "tipo": "regiao",
+  "uf": null,
+  "arquivo_kml": "estados.kml",
+  "pasta": "regioes/Sul",
+  "ufs": [
+    "PR",
+    "RS",
+    "SC"
+  ]
+}

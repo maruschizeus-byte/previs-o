@@ -241,7 +241,8 @@ def montar_alvos(args, fundo, mesos):
     alvos = []
     cidades = _ler_opcional(args.cidades, g.ler_cidades)          # uma por mesorregião
     municipios = _ler_opcional(args.municipios, g.ler_municipios)  # para achar as capitais
-    print(f"Cidades: {len(cidades)} principais, {len(municipios)} municípios")
+    fixas = _ler_opcional(args.cidades_mapa, lambda c: g.ler_cidades_mapa(c, municipios)) if municipios else []
+    print(f"Cidades: {len(cidades)} principais, {len(fixas)} do cidades_mapa.csv, {len(municipios)} municípios")
     caixas = [g.bbox_enquadramento(r) for r in fundo]
     lo0, la0 = min(c[0] for c in caixas), min(c[1] for c in caixas)
     lo1, la1 = max(c[2] for c in caixas), max(c[3] for c in caixas)
@@ -259,11 +260,11 @@ def montar_alvos(args, fundo, mesos):
                "rotulos": [(u, *g.ponto_para_rotulo(por_uf[u])) for u in presentes]}
         alvos.append((os.path.join("regioes", g._pasta_segura(nome_reg)), reg,
                       (min(c[0] for c in cx) - m, max(c[2] for c in cx) + m,
-                       min(c[1] for c in cx) - m, max(c[3] for c in cx) + m), g.capitais_da_regiao(presentes, municipios)))
+                       min(c[1] for c in cx) - m, max(c[3] for c in cx) + m), g.capitais_da_regiao(presentes, municipios, fixas)))
     for r in sorted(fundo, key=lambda r: g.UF_NOMES.get(g.uf_sigla(r, fundo), r["nome"])):
         b = g.bbox_enquadramento(r)
         alvos.append((g.subdir_do_alvo(r, fundo), r, (b[0] - m, b[2] + m, b[1] - m, b[3] + m),
-                      g.cidades_do_estado(r, cidades, municipios, fundo)))
+                      g.cidades_do_estado(r, cidades, municipios, fundo, fixas=fixas)))
     if args.grupos:  # grupos de pontos (ex.: AMAGGI), só o mapa do estado
         for gr in g.ler_grupos(args.grupos).values():
             estado = por_uf.get(gr["uf"])
@@ -331,6 +332,7 @@ def main():
     ap.add_argument("--grupos", default=None, help="grupos.json para incluir grupos (ex.: AMAGGI)")
     ap.add_argument("--cidades", default=g.CIDADES_PADRAO, help="CSV das cidades principais (mapas de estado)")
     ap.add_argument("--municipios", default=g.MUNICIPIOS_PADRAO, help="CSV das sedes dos municípios (capitais)")
+    ap.add_argument("--cidades-mapa", default=g.CIDADES_MAPA_PADRAO, help="CSV (nome,uf) das cidades que devem aparecer")
     ap.add_argument("--mes-inicio", default=None, help="primeiro dos 3 meses (AAAA-MM). Padrão: mês atual")
     ap.add_argument("--sistema", default=SISTEMA_PADRAO, help=f"sistema do ECMWF no Copernicus (padrão {SISTEMA_PADRAO})")
     ap.add_argument("--sem-anomalia", action="store_true", help="só a previsão, sem os mapas de anomalia")

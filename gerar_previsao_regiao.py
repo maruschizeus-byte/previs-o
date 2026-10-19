@@ -62,6 +62,8 @@ CIDADES_PADRAO = "Cidades_principais_137_mesorregioes_Brasil.csv"
 # Sedes dos 5.570 municípios (IBGE), para as cidades de referência no mapa de um ponto.
 # Base: github.com/kelvins/Municipios-Brasileiros (licença MIT).
 MUNICIPIOS_PADRAO = "municipios_brasil.csv"
+# Cidades que devem aparecer nos mapas (nome,uf). As coordenadas vêm dos municípios.
+CIDADES_MAPA_PADRAO = "cidades_mapa.csv"
 
 # Domínio de reserva. O domínio efetivo cobre todos os enquadramentos + borda.
 # Os campos globais são baixados uma vez por parâmetro/passo e recortados ao ler.
@@ -802,24 +804,68 @@ def _km(lat1, lon1, lat2, lon2):
     return 12742 * math.asin(min(1.0, math.sqrt(a)))
 
 
-def cidades_do_estado(estado, cidades, municipios, estados, maximo=16):
-    """Capital e cidades principais (uma por mesorregião, do CSV) dentro do estado."""
+def ler_cidades_mapa(caminho, municipios):
+    """cidades_mapa.csv (nome,uf[,lat,lon]) -> cidades com coordenadas. O nome é procurado
+    nos municípios sem acento; aceita abreviação se só houver uma cidade assim no estado.
+    Se a cidade não estiver no estado indicado, mas existir em um só outro, usa esse."""
+    import csv
+    saida = []
+    with open(caminho, encoding="utf-8-sig", newline="") as f:
+        for r in csv.DictReader(f):
+            nome, uf = (r.get("nome") or "").strip(), (r.get("uf") or "").strip().upper()
+            if not nome:
+                continue
+            if (r.get("lat") or "").strip() and (r.get("lon") or "").strip():
+                try:
+                    saida.append({"nome": nome, "uf": uf, "lat": float(r["lat"].replace(",", ".")),
+                                  "lon": float(r["lon"].replace(",", "."))})
+                    continue
+                except ValueError:
+                    pass
+            chave = _sem_acento(nome)
+            achou = [m for m in municipios if m["uf"] == uf and _sem_acento(m["nome"]) == chave]
+            if not achou:
+                achou = [m for m in municipios if m["uf"] == uf and _sem_acento(m["nome"]).startswith(chave)]
+            if not achou:
+                fora = [m for m in municipios if _sem_acento(m["nome"]) == chave]
+                if len(fora) == 1:
+                    print(f"  AVISO: cidades_mapa: {nome} não está em {uf or '?'}; usando {fora[0]['nome']} ({fora[0]['uf']}).")
+                    achou = fora
+            if len(achou) != 1:
+                print(f"  AVISO: cidades_mapa: {nome} ({uf}) "
+                      + ("não encontrada" if not achou else "é ambígua: " + ", ".join(m["nome"] for m in achou[:4]))
+                      + "; escreva o nome completo ou informe lat e lon.")
+                continue
+            m = achou[0]
+            saida.append({"nome": m["nome"], "uf": m["uf"], "lat": m["lat"], "lon": m["lon"]})
+    return saida
+
+
+def cidades_do_estado(estado, cidades, municipios, estados, maximo=20, fixas=()):
+    """Capital, cidades do cidades_mapa.csv e cidades principais (uma por mesorregião) do estado.
+    Capital e cidades do cidades_mapa.csv sempre aparecem; as principais, se couberem."""
     uf = uf_sigla(estado, estados)
-    capitais = [m for m in municipios if m["capital"] and m["uf"] == uf]
+    capitais = [dict(m, obrigatoria=True) for m in municipios if m["capital"] and m["uf"] == uf]
+    minhas = [dict(c, obrigatoria=True) for c in fixas if c.get("uf") == uf or (not c.get("uf") and ponto_na_regiao(c["lon"], c["lat"], estado))]
     principais = [c for c in cidades if (uf and c.get("uf") == uf) or ponto_na_regiao(c["lon"], c["lat"], estado)]
     escolhidas = []
-    for c in capitais + principais:  # a capital primeiro: é a que nunca fica de fora
+    for c in capitais + minhas + principais:  # nesta ordem de prioridade
         if all(_km(c["lat"], c["lon"], e["lat"], e["lon"]) > 15 for e in escolhidas):
-            escolhidas.append({"nome": c["nome"], "lat": c["lat"], "lon": c["lon"], "capital": bool(c.get("capital"))})
+            escolhidas.append({"nome": c["nome"], "lat": c["lat"], "lon": c["lon"], "capital": bool(c.get("capital")),
+                               "obrigatoria": bool(c.get("obrigatoria"))})
     return escolhidas[:maximo]
 
 
-def capitais_da_regiao(ufs, municipios):
-    return [{"nome": m["nome"], "lat": m["lat"], "lon": m["lon"], "capital": True}
-            for m in municipios if m["capital"] and m["uf"] in ufs]
+def capitais_da_regiao(ufs, municipios, fixas=()):
+    """Capitais (sempre) e, se couberem, as cidades do cidades_mapa.csv da região."""
+    capitais = [{"nome": m["nome"], "lat": m["lat"], "lon": m["lon"], "capital": True}
+                for m in municipios if m["capital"] and m["uf"] in ufs]
+    extras = [{"nome": c["nome"], "lat": c["lat"], "lon": c["lon"]} for c in fixas
+              if c.get("uf") in ufs and all(_km(c["lat"], c["lon"], k["lat"], k["lon"]) > 15 for k in capitais)]
+    return capitais + extras
 
 
-def cidades_perto_do_ponto(lat, lon, extent, municipios, principais=(), minimo=2):
+def cidades_perto_do_ponto(lat, lon, extent, municipios, principais=(), minimo=2, fixas=()):
     """Cidades de referência para o mapa de um ponto: até 2 referências grandes do
     quadro (capital ou cidade principal) e as sedes mais próximas do ponto, bem
     espaçadas, somando 3 ou 4. Fora das bordas, para o nome não sair cortado."""
@@ -830,7 +876,8 @@ def cidades_perto_do_ponto(lat, lon, extent, municipios, principais=(), minimo=2
     grandes = {_sem_acento(c["nome"]): c for c in principais}
     for m in dentro:
         c = grandes.get(_sem_acento(m["nome"]))
-        m["peso"] = 2 if m["capital"] else 1 if c and _km(c["lat"], c["lon"], m["lat"], m["lon"]) < 30 else 0
+        minha = any(_km(f["lat"], f["lon"], m["lat"], m["lon"]) < 3 for f in fixas)  # do cidades_mapa.csv
+        m["peso"] = 2 if m["capital"] or minha else 1 if c and _km(c["lat"], c["lon"], m["lat"], m["lon"]) < 30 else 0
     escolhidas = []
     livre = lambda m, espaco, perto: (m not in escolhidas and m["dist"] >= perto and
                                       all(_km(m["lat"], m["lon"], e["lat"], e["lon"]) >= espaco for e in escolhidas))
@@ -1442,7 +1489,7 @@ def _rotular_cidades(ax, renderer, cidades, obstaculos=(), pular=False, siglas=N
     for i, c in enumerate(cidades):
         x, y = ax.transData.transform((c["lon"], c["lat"]))
         marca = marcas[i]
-        obrig = pular and c.get("capital")  # capital: sempre entra e passa na frente das siglas
+        obrig = pular and (c.get("capital") or c.get("obrigatoria"))  # sempre entra e passa na frente das siglas
         if pular:  # só o que já entrou bloqueia; o ponto da cidade também precisa estar livre
             bloqueios = caixas + list(obstaculos) + ([] if obrig else [caixa_sigla(t) for t in siglas])
             if not obrig and any(marca.overlaps(o) for o in bloqueios):
@@ -1984,6 +2031,8 @@ def main():
     ap.add_argument("--ponto", nargs=2, action="append", metavar=("NOME", "COORDENADA"),
                     help="mapas só em volta de um ponto, separados dos outros (pode repetir). "
                          "Ex.: --ponto \"Fazenda Boa Vista\" \"-15.601, -56.097\"")
+    ap.add_argument("--cidades-mapa", default=CIDADES_MAPA_PADRAO,
+                    help=f"CSV (nome,uf) com cidades que devem aparecer nos mapas (padrão: {CIDADES_MAPA_PADRAO})")
     ap.add_argument("--municipios", default=MUNICIPIOS_PADRAO,
                     help=f"CSV das sedes dos municípios, para as cidades de referência do mapa de um ponto "
                          f"(padrão: {MUNICIPIOS_PADRAO})")
@@ -2144,6 +2193,18 @@ def main():
             print(f"  AVISO: não consegui ler os municípios ({e}); uso só as cidades principais.")
     elif args.ponto:
         print(f"  AVISO: {args.municipios} não encontrado; uso só as cidades principais, que podem não aparecer.")
+    fixas = []  # cidades que devem aparecer nos mapas (cidades_mapa.csv)
+    caminho_fixas = args.cidades_mapa
+    if caminho_fixas and not os.path.isfile(caminho_fixas) and not os.path.isabs(caminho_fixas):
+        caminho_fixas = os.path.join(os.path.dirname(os.path.abspath(__file__)), caminho_fixas)
+    if caminho_fixas and os.path.isfile(caminho_fixas):
+        if not municipios:
+            print(f"  AVISO: {args.cidades_mapa} precisa do {args.municipios} para achar as coordenadas.")
+        try:
+            fixas = ler_cidades_mapa(caminho_fixas, municipios)
+            print(f"Cidades do mapa: {len(fixas)} de {caminho_fixas}")
+        except (ValueError, OSError, KeyError) as e:
+            print(f"  AVISO: não consegui ler {caminho_fixas}: {e}")
     # logo (opcional): resolve uma vez; se faltar, segue sem
     logo = None
     if args.logo:
@@ -2176,9 +2237,13 @@ def main():
         cids = list(cidades_cli)
         try:
             if r.get("tipo") == "estado":
-                cids += cidades_do_estado(r, cidades_arquivo, municipios, fundo_regioes)
+                cids += cidades_do_estado(r, cidades_arquivo, municipios, fundo_regioes, fixas=fixas)
             else:
                 cids += cidades_da_mesorregiao(r, cidades_arquivo, fundo_regioes)
+                if r.get("tipo") == "mesorregiao":  # cidades do cidades_mapa.csv que caem nela
+                    cids += [{"nome": f["nome"], "lat": f["lat"], "lon": f["lon"]} for f in fixas
+                             if ponto_na_regiao(f["lon"], f["lat"], r)
+                             and all(_km(f["lat"], f["lon"], c["lat"], c["lon"]) > 15 for c in cids)]
         except ValueError as e:
             sys.exit(f"ERRO nas cidades: {e}")
         sub = subdir_do_alvo(r, fundo_regioes)
@@ -2217,7 +2282,7 @@ def main():
                    "poligonos": [p for e in estados_reg for p in e["poligonos"]],
                    "rotulos": [(u, *ponto_para_rotulo(por_uf[u])) for u in presentes]}
             sub_reg = os.path.join("regioes", _pasta_segura(nome_reg))
-            alvos.append((sub_reg, reg, ext_reg, capitais_da_regiao(presentes, municipios)))
+            alvos.append((sub_reg, reg, ext_reg, capitais_da_regiao(presentes, municipios, fixas)))
             print(f"Alvo: Região {nome_reg} -> {sub_reg}  ({', '.join(presentes)})")
 
     for pedido in pedidos:
@@ -2340,7 +2405,7 @@ def main():
                  "pontos": [{"nome": nome_ponto, "lat": lat, "lon": lon}], "poligonos": [],
                  "campos": {}, "chaves": [], "arquivo": "", "contornos": [], "rotulos_contornos": [],
                  "rotulos": siglas_no_quadro(fundo_regioes, ext_p, (lon, lat))}
-        cids = cidades_perto_do_ponto(lat, lon, ext_p, base_cidades, cidades_arquivo)
+        cids = cidades_perto_do_ponto(lat, lon, ext_p, base_cidades, cidades_arquivo, fixas=fixas)
         alvos.append((_pasta_segura(nome_ponto), reg_p, ext_p, cids))
         print(f"Alvo: ponto {nome_ponto} ({lat:.5f}, {lon:.5f}) -> {_pasta_segura(nome_ponto)}/  "
               f"{args.raio:g} km para cada lado{', ' + uf if uf else ''} | cidades: "

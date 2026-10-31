@@ -1,0 +1,13 @@
+{
+  "nome": "Sudeste",
+  "tipo": "regiao",
+  "uf": null,
+  "arquivo_kml": "estados.kml",
+  "pasta": "regioes/Sudeste",
+  "ufs": [
+    "ES",
+    "MG",
+    "RJ",
+    "SP"
+  ]
+}

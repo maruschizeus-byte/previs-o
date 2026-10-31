@@ -1,0 +1,16 @@
+{
+  "nome": "Norte",
+  "tipo": "regiao",
+  "uf": null,
+  "arquivo_kml": "estados.kml",
+  "pasta": "regioes/Norte",
+  "ufs": [
+    "AC",
+    "AP",
+    "AM",
+    "PA",
+    "RO",
+    "RR",
+    "TO"
+  ]
+}

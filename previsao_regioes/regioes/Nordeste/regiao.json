@@ -1,0 +1,18 @@
+{
+  "nome": "Nordeste",
+  "tipo": "regiao",
+  "uf": null,
+  "arquivo_kml": "estados.kml",
+  "pasta": "regioes/Nordeste",
+  "ufs": [
+    "AL",
+    "BA",
+    "CE",
+    "MA",
+    "PB",
+    "PE",
+    "PI",
+    "RN",
+    "SE"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "nome": "Centro-Oeste",
+  "tipo": "regiao",
+  "uf": null,
+  "arquivo_kml": "estados.kml",
+  "pasta": "regioes/Centro-Oeste",
+  "ufs": [
+    "DF",
+    "GO",
+    "MT",
+    "MS"
+  ]
+}
